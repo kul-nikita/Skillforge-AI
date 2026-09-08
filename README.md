@@ -183,6 +183,32 @@ the theme by using the tokens, not by carrying its own colours.
   without explicit consent, and a learner can export everything as JSON or
   delete their account, which also revokes every session.
 
+### Admin access
+
+There is no separate admin account type and no shared admin password. `/admin`
+and `/api/admin/*` check the email on your ordinary session against the
+`ADMIN_EMAILS` allowlist (`lib/auth/admin.ts`); **unset means nobody is an
+admin**, so the catalog is closed by default. A non-admin gets `403` from the
+API and `404` from the page — it does not advertise that it exists.
+
+The demo curator account is **`admin@skillforge.dev`**. Its password is not
+committed: this repository is public, and the admin surface writes MongoDB,
+Neo4j and Qdrant in one action, including deletes. Ask a maintainer for it, or
+make your own admin in two steps:
+
+```bash
+# 1. add the address to the allowlist, then restart the server
+ADMIN_EMAILS=you@example.com
+
+# 2. sign up with that same address at /signup — the account is now an admin
+```
+
+The allowlist lives in `.env` locally and in the hosting provider's environment
+variables in production; changing it takes effect on the next restart. Passwords
+are scrypt hashes with a per-user salt, so a forgotten one cannot be recovered —
+and there is **no reset flow**, which is a real gap rather than a design
+decision.
+
 ---
 
 ## Running it
