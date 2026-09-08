@@ -32,8 +32,34 @@ export function buildIntentSchema(roles: Role[]) {
     ...learnerProfileShape.shape,
     timelineWeeks: z.number().int().min(1).max(52),
     weeklyHours: z.number().min(1).max(60),
-    preferences: preferencesShape
+    preferences: preferencesShape,
+    /**
+     * Fields the model had to invent because the learner never said them.
+     * Without this the guesses are indistinguishable from what was actually
+     * stated, and the review screen presents both as "what we understood".
+     */
+    assumed: z.array(z.string()).default([]),
+    /** Asked only when a guess was made about something that matters. */
+    followUpQuestion: z.string().nullable().default(null)
   });
+}
+
+/**
+ * A guess about the learner's format preference is harmless — the diagnostic and
+ * the scorer correct for it. A guess about the role, the deadline or the hours
+ * available shapes the entire roadmap, so it is worth one question.
+ */
+export const CRITICAL_FIELDS = ["targetRoleId", "timelineWeeks", "weeklyHours"] as const;
+
+/** At most two follow-ups: past that it is an interrogation, not an onboarding. */
+export const MAX_FOLLOW_UPS = 2;
+
+export function needsFollowUp(assumed: string[], askedSoFar: number, question: string | null): boolean {
+  if (askedSoFar >= MAX_FOLLOW_UPS || !question) {
+    return false;
+  }
+
+  return assumed.some((field) => (CRITICAL_FIELDS as readonly string[]).includes(field));
 }
 
 export type LearnerIntent = z.infer<ReturnType<typeof buildIntentSchema>>;
@@ -58,6 +84,8 @@ function responseSchema(roleIds: string[]) {
       },
       timelineWeeks: { type: "INTEGER" },
       weeklyHours: { type: "NUMBER" },
+      assumed: { type: "ARRAY", items: { type: "STRING" } },
+      followUpQuestion: { type: "STRING", nullable: true },
       preferences: {
         type: "OBJECT",
         properties: {
@@ -82,14 +110,21 @@ function responseSchema(roleIds: string[]) {
       "learningStyle",
       "timelineWeeks",
       "weeklyHours",
-      "preferences"
+      "preferences",
+      "assumed"
     ]
   };
 }
 
-/** A learner's natural-language goal, as a structured profile. */
+/**
+ * A learner's natural-language goal, as a structured profile.
+ *
+ * Takes the whole conversation so far rather than one message, so a follow-up
+ * answer is read in the context of what was already said instead of replacing
+ * it.
+ */
 export async function extractLearnerIntent(
-  goalText: string,
+  transcript: string,
   roles: Role[]
 ): Promise<LearnerIntent> {
   if (roles.length === 0) {
@@ -130,6 +165,13 @@ RULES:
 9. If timeline is missing, estimate a realistic 1-52 weeks. If weekly study time
    or session length is missing, estimate a reasonable commitment.
 10. Keep arrays concise and useful for later skill-gap analysis.
+11. List in "assumed" every field you filled from inference rather than from
+    something the learner actually said. Be honest: a plausible default is still
+    an assumption.
+12. If you assumed targetRoleId, timelineWeeks or weeklyHours, set
+    followUpQuestion to ONE short, friendly question that would let you stop
+    assuming it. Ask about one thing only, in plain language, and never list the
+    role ids at the learner. Otherwise set it to null.
 
 Return ONLY the structured JSON response matching the provided schema.
 `;
@@ -139,7 +181,7 @@ Return ONLY the structured JSON response matching the provided schema.
   return geminiJson(
     {
       system: systemInstruction,
-      user: goalText,
+      user: transcript,
       responseSchema: responseSchema(roles.map((role) => role.id))
     },
     buildIntentSchema(roles)

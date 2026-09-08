@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildIntentSchema } from "@/lib/llm/intent-extraction";
+import { CRITICAL_FIELDS, MAX_FOLLOW_UPS, buildIntentSchema, needsFollowUp } from "@/lib/llm/intent-extraction";
 import type { Role } from "@/lib/types";
 
 const roles: Role[] = [
@@ -70,5 +70,54 @@ describe("learner intent validation (LLM trust boundary)", () => {
     expect(
       schema.safeParse({ ...valid, preferences: { ...valid.preferences, format: "hologram" } }).success
     ).toBe(false);
+  });
+});
+
+describe("follow-up decision", () => {
+  it("asks when the model guessed something that shapes the roadmap", () => {
+    for (const field of CRITICAL_FIELDS) {
+      expect(needsFollowUp([field], 0, "How long do you have?")).toBe(true);
+    }
+  });
+
+  it("does not ask about guesses that the diagnostic will correct anyway", () => {
+    // Format, style and prior skills are all re-measured downstream; the role,
+    // the deadline and the weekly budget are not.
+    expect(needsFollowUp(["learningStyle", "currentSkills", "preferences"], 0, "Anything else?")).toBe(false);
+  });
+
+  it("does not ask when nothing was guessed", () => {
+    expect(needsFollowUp([], 0, "How long do you have?")).toBe(false);
+  });
+
+  it("does not ask without a question to put", () => {
+    expect(needsFollowUp(["weeklyHours"], 0, null)).toBe(false);
+    expect(needsFollowUp(["weeklyHours"], 0, "")).toBe(false);
+  });
+
+  it("stops after the cap, however much is still assumed", () => {
+    expect(needsFollowUp(["targetRoleId"], MAX_FOLLOW_UPS - 1, "One more?")).toBe(true);
+    expect(needsFollowUp(["targetRoleId"], MAX_FOLLOW_UPS, "One more?")).toBe(false);
+    expect(needsFollowUp(["targetRoleId"], MAX_FOLLOW_UPS + 5, "One more?")).toBe(false);
+  });
+});
+
+describe("assumption reporting", () => {
+  it("defaults to no assumptions and no question when the model omits them", () => {
+    const parsed = buildIntentSchema(roles).parse(valid);
+
+    expect(parsed.assumed).toEqual([]);
+    expect(parsed.followUpQuestion).toBeNull();
+  });
+
+  it("keeps the assumptions the model reports", () => {
+    const parsed = buildIntentSchema(roles).parse({
+      ...valid,
+      assumed: ["weeklyHours", "timelineWeeks"],
+      followUpQuestion: "How many hours a week can you give it?"
+    });
+
+    expect(parsed.assumed).toEqual(["weeklyHours", "timelineWeeks"]);
+    expect(needsFollowUp(parsed.assumed, 0, parsed.followUpQuestion)).toBe(true);
   });
 });

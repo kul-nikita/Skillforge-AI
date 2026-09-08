@@ -863,6 +863,41 @@ knows where things stand without re-deriving it.
   1 -> 2 -> 3 -> underway, a 14-question diagnostic, a graded completion scoring
   1.0 and minting evidence, and every authenticated route rendering.
 
+- 2026-09-08: **Onboarding is a conversation now, and it has a floor.**
+  Audited against the brief's "conversational interface where learners describe
+  their goals in natural language". The natural-language half was real — free
+  prose, a Gemini `responseSchema` whose role enum is built from Neo4j per
+  request, zod re-validation, and a review screen before anything persists. Two
+  things were not.
+  **It was not a conversation.** One textarea, one shot. Given "i want a tech
+  job" the model still had to produce a role, a timeline, weekly hours, an
+  experience level and a learning style, and the UI then showed those guesses
+  under "Here's what we understood". The extraction now returns `assumed` — the
+  fields it filled by inference — and a `followUpQuestion`. When a *critical*
+  guess was made (role, timeline, weekly hours) the server asks instead of
+  assuming, up to `MAX_FOLLOW_UPS` of 2, and the whole transcript is resent each
+  turn so an answer adds to the goal rather than replacing it. Guesses that
+  survive are named on the review card, because a guess presented as
+  understanding is a small lie. Non-critical guesses are left alone: the
+  diagnostic and the scorer re-measure those anyway.
+  **There was no fallback, and it was live-broken.** With Gemini unavailable,
+  `POST /api/onboarding` returned 502 and there was no other route to a profile
+  anywhere in the UI — the PUT that saves only ran after a successful parse. So
+  a model outage locked a learner out of the entire product at step one, while
+  explanations, the coach and the mentor all degraded gracefully.
+  `components/ManualSetup.tsx` is the floor: role picked from the seeded graph,
+  hours, weeks, cost, straight to the same PUT. The route now flags
+  `modelUnavailable` so the client switches to it automatically, and the first
+  screen offers "Or pick a role directly" regardless.
+  Verified: 188 unit tests (7 new on the follow-up decision and assumption
+  reporting), typecheck, lint, build, and 8/8 live — outage flagged, manual
+  setup saving a working profile, dashboard and journey advancing from it, and
+  the multi-turn request shape accepted.
+  **Still unproven live: the conversation itself.** The Gemini free-tier quota
+  stayed exhausted (`429` after retries) for the whole session, so every attempt
+  fell through to the fallback. The turn logic is unit-tested and the wire shape
+  is confirmed; an actual model-asked follow-up has not been seen.
+
 - [x] Repo scaffolded; Neo4j, MongoDB, and Qdrant all connected
 - [x] Skill graph + prerequisite edges seeded in Neo4j — 9 domains, 19 roles,
       96 skills

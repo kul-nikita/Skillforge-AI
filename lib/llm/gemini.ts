@@ -1,4 +1,4 @@
-import type { ZodType } from "zod";
+import type { ZodType, ZodTypeDef } from "zod";
 
 /**
  * One place where a Gemini call is made.
@@ -140,7 +140,12 @@ export async function geminiText(call: GeminiCall): Promise<string> {
 }
 
 /** Structured output, validated against a zod schema before it can be used. */
-export async function geminiJson<T>(call: GeminiCall, schema: ZodType<T>): Promise<T> {
+// The input type is left open: a schema using .default() has optional inputs
+// and a required output, and callers care about the output.
+export async function geminiJson<T>(
+  call: GeminiCall,
+  schema: ZodType<T, ZodTypeDef, unknown>
+): Promise<T> {
   const text = await geminiText(call);
 
   let parsed: unknown;

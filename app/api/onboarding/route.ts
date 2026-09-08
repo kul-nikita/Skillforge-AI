@@ -2,16 +2,40 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/session";
 import { listRoles } from "@/lib/graph/queries";
-import { extractLearnerIntent } from "@/lib/llm/intent-extraction";
+import { extractLearnerIntent, needsFollowUp } from "@/lib/llm/intent-extraction";
+import { GeminiError } from "@/lib/llm/gemini";
 import { upsertProfile } from "@/lib/db/learners";
 import { setConsent } from "@/lib/db/users";
 import { preferencesSchema } from "@/lib/db/schemas";
 
 export const dynamic = "force-dynamic";
 
-const parseSchema = z.object({ goal: z.string().min(3).max(2000) });
+const parseSchema = z.object({
+  goal: z.string().min(3).max(2000),
+  /** Answers to the follow-ups asked so far, oldest first. */
+  replies: z
+    .array(
+      z.object({
+        question: z.string().min(1).max(300),
+        answer: z.string().min(1).max(500)
+      })
+    )
+    .max(4)
+    .default([])
+});
 
-/** Step 1: free text → structured intent. Nothing is written yet. */
+/** The whole conversation, so a follow-up answer adds to the goal rather than replacing it. */
+function buildTranscript(goal: string, replies: Array<{ question: string; answer: string }>) {
+  return [
+    `LEARNER'S GOAL: ${goal}`,
+    ...replies.map(({ question, answer }) => `YOU ASKED: ${question}\nLEARNER ANSWERED: ${answer}`)
+  ].join("\n\n");
+}
+
+/**
+ * Step 1: free text -> structured intent, asking a follow-up when the model had
+ * to guess something that shapes the whole roadmap. Nothing is written yet.
+ */
 export async function POST(request: Request) {
   try {
     await requireUser();
@@ -26,17 +50,32 @@ export async function POST(request: Request) {
   }
 
   const roles = await listRoles();
+  const { goal, replies } = parsed.data;
 
   try {
-    const intent = await extractLearnerIntent(parsed.data.goal, roles);
+    const intent = await extractLearnerIntent(buildTranscript(goal, replies), roles);
+
+    if (needsFollowUp(intent.assumed, replies.length, intent.followUpQuestion)) {
+      // Guessing the role, the deadline or the weekly budget shapes everything
+      // downstream, so ask rather than present the guess as understanding.
+      return NextResponse.json({ done: false, question: intent.followUpQuestion });
+    }
+
     const role = roles.find((candidate) => candidate.id === intent.targetRoleId)!;
 
     // Echo the matched role so the learner can correct it before anything is saved.
-    return NextResponse.json({ intent, role });
+    return NextResponse.json({ done: true, intent, role, assumed: intent.assumed });
   } catch (error) {
     console.error("[onboarding] intent extraction failed:", error instanceof Error ? error.message : error);
+
+    // Onboarding is step one: if it cannot complete, nothing else in the product
+    // can be reached. The client falls back to choosing a role directly, so a
+    // model outage costs the conversation, not the account.
     return NextResponse.json(
-      { error: "Could not read that goal right now. Try again in a moment." },
+      {
+        error: "The assistant is unavailable right now — you can set your goal manually instead.",
+        modelUnavailable: error instanceof GeminiError
+      },
       { status: 502 }
     );
   }
