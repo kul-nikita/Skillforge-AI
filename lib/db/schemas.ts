@@ -8,33 +8,6 @@ export const preferencesSchema = z.object({
   format: z.enum(["course", "lab", "doc", "project", "video", "any"])
 });
 
-export const learnerProfileSchema = z.object({
-  learnerId: z.string(),
-
-  targetRoleId: z.string().min(1),
-  careerObjective: z.string().min(1),
-
-  experienceLevel: z.enum(["beginner", "intermediate", "advanced"]),
-  currentSkills: z.array(z.string()),
-  interests: z.array(z.string()),
-  learningHistory: z.array(z.string()),
-  preferredTechnologies: z.array(z.string()),
-  learningStyle: z.enum([
-    "hands-on",
-    "visual",
-    "reading",
-    "mixed",
-    "unknown"
-  ]),
-
-  timelineWeeks: z.number().int().positive(),
-  weeklyHours: z.number().positive(),
-
-  preferences: preferencesSchema,
-
-  consentGiven: z.boolean()
-});
-
 export const evidenceSchema = z.object({
   id: z.string(),
   learnerId: z.string(),

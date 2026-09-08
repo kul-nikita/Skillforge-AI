@@ -22,10 +22,9 @@ type Outcome = {
 };
 
 /**
- * Finishing a resource is where mastery actually moves, so it cannot be a
- * checkbox (product rule 4). The learner answers a short post-check graded on
- * the server, writes their own summary, and only then does an event get
- * appended and evidence get issued.
+ * Finishing a resource is where mastery moves, so it cannot be a checkbox
+ * (product rule 4): a server-graded post-check and the learner's own summary
+ * come first, and only then is an event appended and evidence issued.
  */
 export function CompleteResource({
   resourceId,
@@ -41,6 +40,8 @@ export function CompleteResource({
   const [mode, setMode] = useState<"choose" | "quiz" | "interview">("choose");
   const [open, setOpen] = useState(false);
   const [questions, setQuestions] = useState<Question[] | null>(null);
+  // Signed proof of which questions were issued; grading rejects a submission without it.
+  const [token, setToken] = useState<string | null>(null);
   const [picked, setPicked] = useState<Record<string, number>>({});
   const [summary, setSummary] = useState("");
   const [artifactUrl, setArtifactUrl] = useState("");
@@ -59,6 +60,7 @@ export function CompleteResource({
         return;
       }
       setQuestions(data.questions);
+      setToken(data.token);
       setOpen(true);
       setMode("quiz");
     } catch {
@@ -69,7 +71,7 @@ export function CompleteResource({
   }
 
   async function submit() {
-    if (!questions) {
+    if (!questions || !token) {
       return;
     }
     setBusy(true);
@@ -81,8 +83,8 @@ export function CompleteResource({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           resourceId,
-          // -1 means skipped, and grades as incorrect — same convention as the
-          // diagnostic, so an unanswered question is never silently credited.
+          token,
+          // -1 is "skipped" and grades as incorrect, as in the diagnostic.
           answers: questions.map((question) => ({
             questionId: question.id,
             selectedIndex: picked[question.id] ?? -1
@@ -162,7 +164,6 @@ export function CompleteResource({
     );
   }
 
-  // Interview mode
   if (mode === "interview" && skillId && skillName) {
     return (
       <div className="mt-4">
@@ -191,7 +192,6 @@ export function CompleteResource({
     );
   }
 
-  // Choice mode - offer both options
   if (!open) {
     return (
       <div className="mt-4">

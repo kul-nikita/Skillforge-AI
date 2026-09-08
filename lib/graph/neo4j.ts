@@ -8,7 +8,7 @@ import neo4j, { type Driver } from "neo4j-driver";
  */
 const globalForNeo4j = globalThis as typeof globalThis & { __neo4jDriver?: Driver };
 
-export function getNeo4jDriver() {
+function getNeo4jDriver() {
   const uri = process.env.NEO4J_URI;
   const user = process.env.NEO4J_USER;
   const password = process.env.NEO4J_PASSWORD;

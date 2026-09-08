@@ -79,28 +79,6 @@ export function planWeek({
   return { weeklyHours, minutesPlanned, included, deferred };
 }
 
-/**
- * Every skill that depends on `skillId`, directly or transitively.
- * Kept for offline/pure use; at runtime the same traversal runs in Cypher via
- * `findDownstreamSkills`, which is authoritative.
- */
-export function downstreamSkills(graph: SkillGraph, skillId: string): string[] {
-  const found = new Set<string>();
-  const queue = [skillId];
-
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    for (const skill of graph.skills) {
-      if (skill.prerequisites.includes(current) && !found.has(skill.id)) {
-        found.add(skill.id);
-        queue.push(skill.id);
-      }
-    }
-  }
-
-  return [...found];
-}
-
 export type AssessmentOutcome = {
   action: "insert_remediation_and_delay_dependents" | "retain_plan_with_extra_practice" | "unlock_next_valid_module" | "retain_plan";
   remediation: LearningResource | null;
@@ -109,7 +87,7 @@ export type AssessmentOutcome = {
 };
 
 /**
- * MVP adaptation rule from ARCHITECTURE.md. Remediation is picked
+ * The adaptation rule from ARCHITECTURE.md. Remediation is picked
  * deterministically: the easiest, shortest resource still teaching the skill.
  */
 export function applyAssessmentOutcome({
@@ -182,10 +160,9 @@ function pickRemediation(resources: LearningResource[], skillId: string, mastery
 }
 
 /**
- * Only the verbs that map onto a field the scorer actually reads. "too easy" /
- * "too difficult" would need a difficulty dimension in the scoring formula,
- * which ARCHITECTURE.md doesn't define — left out rather than faked.
- * "Not relevant" is handled by `excludeResourceIds` on planWeek instead.
+ * Only verbs that map onto a field the scorer reads. "too easy"/"too difficult"
+ * would need a difficulty term the scoring formula does not define, and "not
+ * relevant" is `excludeResourceIds` on planWeek.
  */
 export type FeedbackVerb = "more_hands_on" | "less_time";
 

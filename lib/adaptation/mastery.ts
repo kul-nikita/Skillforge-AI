@@ -45,22 +45,6 @@ export function deriveMasteryFromEvents(events: LearningEvent[]): MasteryMap {
   );
 }
 
-export function nextAdaptationAction(assessmentScore: number, finishedEarly: boolean) {
-  if (assessmentScore < 0.6) {
-    return "insert_remediation_and_delay_dependents" as const;
-  }
-
-  if (assessmentScore <= 0.8) {
-    return "retain_plan_with_extra_practice" as const;
-  }
-
-  if (finishedEarly) {
-    return "unlock_next_valid_module" as const;
-  }
-
-  return "retain_plan" as const;
-}
-
 function clamp(value: number) {
   return Math.max(0, Math.min(1, value));
 }

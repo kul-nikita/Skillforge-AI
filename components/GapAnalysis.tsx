@@ -52,7 +52,7 @@ const STATUS_CONFIG = {
   missing: { color: "text-red-300 bg-red-500/10", icon: X, label: "Missing" }
 };
 
-export function GapAnalysis({ roleId }: { roleId: string }) {
+export function GapAnalysis() {
   const [jdText, setJdText] = useState("");
   const [result, setResult] = useState<GapAnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -69,7 +69,7 @@ export function GapAnalysis({ roleId }: { roleId: string }) {
       const res = await fetch("/api/jd/parse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jdText, roleId })
+        body: JSON.stringify({ jdText })
       });
 
       if (!res.ok) {

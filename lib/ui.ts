@@ -1,9 +1,5 @@
 /**
- * Shared class strings rather than wrapper components.
- *
- * Buttons and cards appear in roughly twenty places across the app, so the
- * classes are worth naming once — but a `<Button>` component would add a layer
- * whose only job is to forward props to a `<button>`. Some of these render as
+ * Shared class strings rather than wrapper components: some of these render as
  * links and some as buttons, and a string works for both.
  */
 const BUTTON_BASE =

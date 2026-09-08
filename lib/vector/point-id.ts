@@ -1,12 +1,10 @@
 import { createHash } from "node:crypto";
 
 /**
- * Qdrant point IDs must be numeric or a UUID, but our resources are slugs.
- * Deriving the UUID from the slug makes the mapping stable and reversible in
- * practice: re-indexing a resource overwrites its own point instead of adding
- * a duplicate, and deleting one removes the right vector. The seed script used
- * to use the array index, which silently reshuffled every id whenever the
- * catalog order changed.
+ * Qdrant point ids must be numeric or a UUID, but resources are slugs. Deriving
+ * the UUID from the slug keeps the mapping stable: re-indexing overwrites the
+ * right point instead of adding a duplicate, and deleting removes the right
+ * vector. An array index would reshuffle every id when catalog order changed.
  */
 export function pointIdForResource(resourceId: string): string {
   const hex = createHash("md5").update(resourceId).digest("hex");

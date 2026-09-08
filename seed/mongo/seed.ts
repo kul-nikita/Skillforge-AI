@@ -1,8 +1,9 @@
-import { closeMongoClient, getDb } from "@/lib/db/mongo";
+import { closeMongoClient, ensureIndexes, getDb } from "@/lib/db/mongo";
 import { learningResourceSchema } from "@/lib/db/schemas";
 import { allResources } from "@/seed/data";
-import { demoEvidence } from "@/lib/data/demo-catalog";
+import { demoEvidence } from "@/lib/data/demo-learner";
 import { DEMO_LEARNER_ID } from "@/lib/constants";
+import { signEvidence } from "@/lib/crypto/signing";
 import type { LearningResource } from "@/lib/types";
 
 async function main() {
@@ -12,27 +13,22 @@ async function main() {
 
   await collection.deleteMany({});
   await collection.insertMany(parsed.map((resource) => ({ ...resource, _id: resource.id })));
-  await collection.createIndex({ skillTags: 1 });
-  await collection.createIndex({ id: 1 }, { unique: true });
-
-  // Learner-state collections: indexed now so the first real write is fast.
-  await db.collection("learner_profile").createIndex({ learnerId: 1 }, { unique: true });
-  await db.collection("events").createIndex({ learnerId: 1, timestamp: 1 });
-  await db.collection("evidence").createIndex({ learnerId: 1, createdAt: 1 });
-
-  // Auth collections. The unique email index is what makes concurrent signups
-  // safe; TTL on sessions/attempts expires them without a cleanup job.
-  await db.collection("users").createIndex({ email: 1 }, { unique: true });
-  await db.collection("users").createIndex({ id: 1 }, { unique: true });
-  await db.collection("sessions").createIndex({ tokenHash: 1 }, { unique: true });
-  await db.collection("sessions").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-  await db.collection("login_attempts").createIndex({ key: 1 }, { unique: true });
-  await db.collection("login_attempts").createIndex({ firstAttemptAt: 1 }, { expireAfterSeconds: 3600 });
+  // Index definitions live with the app, not here — the app needs them whether
+  // or not this script was ever run.
+  await ensureIndexes(db);
 
   // Sample wallet for the demo learner, so the evidence page has real rows to read.
   const evidence = db.collection("evidence");
   await evidence.deleteMany({ learnerId: DEMO_LEARNER_ID });
-  await evidence.insertMany(demoEvidence.map((row) => ({ ...row, learnerId: DEMO_LEARNER_ID })));
+  // Signed with the real key: the signature attests the record has not been
+  // altered, which is all /verify ever claims. A placeholder string made the
+  // public verify page report every demo row as tampered.
+  await evidence.insertMany(
+    demoEvidence.map((row) => {
+      const record = { ...row, learnerId: DEMO_LEARNER_ID };
+      return { ...record, signature: signEvidence(record) };
+    })
+  );
 
   console.log(`Seeded ${parsed.length} learning resources into MongoDB (db: ${db.databaseName}).`);
 }

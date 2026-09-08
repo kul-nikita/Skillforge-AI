@@ -21,10 +21,6 @@ export async function findResourcesBySkill(skillId: string): Promise<LearningRes
   return rows.map(stripMongoId);
 }
 
-export async function countResources(): Promise<number> {
-  return (await collection()).countDocuments();
-}
-
 function stripMongoId(row: LearningResource & { _id?: string }): LearningResource {
   const { _id: _ignored, ...resource } = row;
   return resource;
@@ -35,7 +31,7 @@ export async function listResources(limit = 500): Promise<LearningResource[]> {
   return rows.map(stripMongoId);
 }
 
-/** Duplicate URLs have been a real defect three times — the check needs a query. */
+/** Duplicate URLs are a recurring catalog defect, so the check is a query. */
 export async function findResourceByUrl(url: string): Promise<LearningResource | null> {
   const row = await (await collection()).findOne({ url }, { projection: { _id: 0 } });
   return row ? stripMongoId(row) : null;

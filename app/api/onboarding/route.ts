@@ -34,8 +34,9 @@ export async function POST(request: Request) {
     // Echo the matched role so the learner can correct it before anything is saved.
     return NextResponse.json({ intent, role });
   } catch (error) {
+    console.error("[onboarding] intent extraction failed:", error instanceof Error ? error.message : error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Could not read that goal." },
+      { error: "Could not read that goal right now. Try again in a moment." },
       { status: 502 }
     );
   }

@@ -1,34 +1,30 @@
+import { GeminiError, postJsonWithRetry } from "@/lib/llm/gemini";
+
 const EMBEDDING_MODEL = "gemini-embedding-001";
 export const EMBEDDING_DIMENSIONS = 768;
 
 export async function embedText(text: string, taskType: "RETRIEVAL_DOCUMENT" | "RETRIEVAL_QUERY") {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is required for embeddings.");
+    throw new GeminiError("GEMINI_API_KEY is required for embeddings.", null, false);
   }
 
-  const response = await fetch(
+  // Shares the retry policy with the generate calls: the free tier rate-limits
+  // batches of embeddings, and a 429 is a wait rather than a failure.
+  const response = await postJsonWithRetry(
     `https://generativelanguage.googleapis.com/v1beta/models/${EMBEDDING_MODEL}:embedContent?key=${apiKey}`,
     {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: `models/${EMBEDDING_MODEL}`,
-        content: { parts: [{ text }] },
-        taskType,
-        outputDimensionality: EMBEDDING_DIMENSIONS
-      })
+      model: `models/${EMBEDDING_MODEL}`,
+      content: { parts: [{ text }] },
+      taskType,
+      outputDimensionality: EMBEDDING_DIMENSIONS
     }
   );
 
-  if (!response.ok) {
-    throw new Error(`Gemini embedding failed: ${response.status} ${await response.text()}`);
-  }
-
-  const payload = await response.json();
+  const payload = await response.json().catch(() => null);
   const values = payload?.embedding?.values;
   if (!Array.isArray(values)) {
-    throw new Error("Gemini embedding response missing values.");
+    throw new GeminiError("Gemini embedding response missing values.", null, true);
   }
 
   return values as number[];

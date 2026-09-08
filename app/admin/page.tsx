@@ -17,9 +17,8 @@ export const metadata = {
 export default async function AdminPage() {
   const user = await requireUserOrRedirect("/admin");
 
-  // notFound rather than a 403 page: a non-admin should not learn that a
-  // catalog admin exists. The API route still enforces this independently, so
-  // hiding the page is defence in depth rather than the actual control.
+  // notFound rather than 403: a non-admin should not learn this page exists.
+  // The API enforces admin independently — hiding the page is not the control.
   if (!isAdmin(user)) {
     notFound();
   }

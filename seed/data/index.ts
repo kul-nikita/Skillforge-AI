@@ -1,47 +1,25 @@
 import type { DomainBundle } from "@/lib/data/catalog-helpers";
 import { defineDomain } from "@/lib/data/catalog-helpers";
-import {
-  domain as cybersecurityDomain,
-  learningResources as cybersecurityResources,
-  roles as cybersecurityRoles,
-  skillGraph as cybersecuritySkills
-} from "@/lib/data/demo-catalog";
-import {
-  domain as dataDomain,
-  learningResources as dataResources,
-  roles as dataRoles,
-  skillGraph as dataSkills
-} from "@/lib/data/data-analytics-catalog";
-import { webDevelopment } from "@/lib/data/domains/web-development";
-import { cloudDevops } from "@/lib/data/domains/cloud-devops";
 import { aiMachineLearning } from "@/lib/data/domains/ai-machine-learning";
-import { uxDesign } from "@/lib/data/domains/ux-design";
-import { productManagement } from "@/lib/data/domains/product-management";
-import { mobileDevelopment } from "@/lib/data/domains/mobile-development";
+import { cloudDevops } from "@/lib/data/domains/cloud-devops";
+import { cybersecurity } from "@/lib/data/domains/cybersecurity";
+import { dataAnalytics } from "@/lib/data/domains/data-analytics";
 import { itSupport } from "@/lib/data/domains/it-support";
+import { mobileDevelopment } from "@/lib/data/domains/mobile-development";
+import { productManagement } from "@/lib/data/domains/product-management";
+import { uxDesign } from "@/lib/data/domains/ux-design";
+import { webDevelopment } from "@/lib/data/domains/web-development";
 
 export type { DomainBundle };
+export { defineDomain };
 
 /**
  * The full seedable catalog. Adding a domain here is the only step needed for
  * the app to support it — nothing downstream hardcodes a domain id.
- *
- * The first two predate `defineDomain` and stamp their own domainId, which is
- * why they are assembled by hand rather than through the helper.
  */
 export const domains: DomainBundle[] = [
-  {
-    domain: cybersecurityDomain,
-    roles: cybersecurityRoles,
-    skills: cybersecuritySkills.skills,
-    resources: cybersecurityResources
-  },
-  {
-    domain: dataDomain,
-    roles: dataRoles,
-    skills: dataSkills.skills,
-    resources: dataResources
-  },
+  cybersecurity,
+  dataAnalytics,
   webDevelopment,
   cloudDevops,
   aiMachineLearning,
@@ -50,8 +28,6 @@ export const domains: DomainBundle[] = [
   mobileDevelopment,
   itSupport
 ];
-
-export { defineDomain };
 
 export const allResources = domains.flatMap((bundle) => bundle.resources);
 export const allSkills = domains.flatMap((bundle) => bundle.skills);

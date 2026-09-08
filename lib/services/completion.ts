@@ -8,11 +8,7 @@ import { signEvidence } from "@/lib/crypto/signing";
 /** Two questions per taught skill — the same ladder depth the diagnostic uses. */
 export const CHECK_QUESTIONS_PER_SKILL = 2;
 
-/**
- * What kind of work the resource represents. The verb matters because
- * `EVENT_WEIGHTS` in lib/adaptation/mastery weighs a reviewed project more
- * heavily than a quiz, so a lab has to be recorded as a lab.
- */
+/** Mastery weights a reviewed project above a quiz, so a lab must record as a lab. */
 const VERB_BY_TYPE: Record<ResourceType, LearningEvent["verb"]> = {
   lab: "lab_completed",
   project: "project_reviewed",
@@ -25,14 +21,9 @@ const VERB_BY_TYPE: Record<ResourceType, LearningEvent["verb"]> = {
 const TIER_ORDER = ["advanced", "intermediate", "beginner"] as const;
 
 /**
- * Post-check questions for a completion.
- *
- * Product rule 4: mastery is a score, not a checkbox — so finishing a resource
- * cannot be self-reported. The learner answers questions drawn from the same
- * server-side bank the diagnostic uses, and only the graded result moves
- * mastery. Questions already answered during the diagnostic are excluded, so
- * this is a fresh check rather than a replay of the answer the learner has
- * already seen.
+ * Product rule 4: finishing a resource cannot be self-reported, so it is graded
+ * from the same server-side bank as the diagnostic. Questions the learner has
+ * already answered are excluded, so a retry is not a replay.
  */
 export function checkQuestionsForResource(
   resource: LearningResource,
@@ -61,11 +52,7 @@ export type SkillResult = {
   questionIds: string[];
 };
 
-/**
- * Grades server-side against the bank. The client posts only the selected
- * index, exactly as the diagnostic does, so the answer key never reaches the
- * browser and a learner cannot award themselves mastery.
- */
+/** Graded against the bank: the client posts an index, never a verdict. */
 export function gradeCompletion(
   resource: LearningResource,
   submitted: SubmittedAnswer[]
@@ -97,11 +84,7 @@ export function gradeCompletion(
   return { bySkill, overall };
 }
 
-/**
- * One event per taught skill. Events are append-only and mastery is derived
- * from them on read, so a completion is replayable and a replan can always
- * explain itself from the log.
- */
+/** One append-only event per taught skill; mastery is derived from them on read. */
 export function completionEvents(
   learnerId: string,
   resource: LearningResource,
@@ -123,14 +106,12 @@ export function completionEvents(
     }));
 }
 
-/** A completion only clears the bar if the learner actually demonstrated it. */
 export const EVIDENCE_THRESHOLD = 0.5;
 
 /**
- * Evidence is generated only from things that actually happened: the rubric
- * score is the graded post-check, the capabilities are the skills the learner
- * passed (named from the graph, not invented), and `artifactUrl` stays null
- * unless the learner supplied one. Nothing here is written by the LLM.
+ * Every field records something that happened: the rubric score is the graded
+ * check, capabilities are the skills passed (named from the graph), and
+ * `artifactUrl` stays null unless the learner supplied one. No LLM involved.
  */
 export function completionEvidence({
   learnerId,
@@ -160,7 +141,8 @@ export function completionEvidence({
 
   return {
     learnerId,
-    skillId: bySkill[0]?.skillId ?? resource.skillTags[0],
+    // A skill actually demonstrated: the first taught one may be the failed one.
+    skillId: passed[0]?.skillId ?? bySkill[0]?.skillId ?? resource.skillTags[0],
     resourceId: resource.id,
     summary,
     evidenceType: resource.evidenceType,

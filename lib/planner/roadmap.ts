@@ -24,46 +24,40 @@ export function planRoadmap({
   masteryThreshold = DEFAULT_MASTERY_THRESHOLD
 }: PlanRoadmapInput): RoadmapPlan {
   const skillById = new Map(graph.skills.map((skill) => [skill.id, skill]));
-  const requiredSkillIds = new Set(role.requiredSkills.map((item) => item.skillId));
-  const requiredSkills = role.requiredSkills
-    .map((required) => {
-      const skill = skillById.get(required.skillId);
-      if (!skill) {
-        throw new Error(`Role ${role.id} references missing skill ${required.skillId}`);
-      }
-      return {
-        skill,
-        importance: required.importance,
-        currentMastery: clampMastery(mastery[required.skillId] ?? 0)
-      };
-    })
-    .filter((gap) => requiredSkillIds.has(gap.skill.id));
 
+  const requiredSkills = role.requiredSkills.map((required) => {
+    const skill = skillById.get(required.skillId);
+
+    if (!skill) {
+      throw new Error(`Role ${role.id} references missing skill ${required.skillId}`);
+    }
+
+    return {
+      skill,
+      importance: required.importance,
+      currentMastery: clampMastery(mastery[required.skillId] ?? 0)
+    };
+  });
+
+  const totalImportance = requiredSkills.reduce((sum, item) => sum + item.importance, 0);
   const readiness =
-    requiredSkills.reduce((sum, item) => sum + item.currentMastery * item.importance, 0) /
-    requiredSkills.reduce((sum, item) => sum + item.importance, 0);
+    totalImportance > 0
+      ? requiredSkills.reduce((sum, item) => sum + item.currentMastery * item.importance, 0) /
+        totalImportance
+      : 0;
 
   const gapCandidates: Gap[] = requiredSkills
     .filter((item) => item.currentMastery < masteryThreshold)
-    .map((item) => ({
-      ...item,
-      reason: buildGapReason(item.skill, mastery)
-    }));
+    .map((item) => ({ ...item, reason: buildGapReason(item.skill, skillById, mastery) }));
 
-  const gaps = topologicalGapOrder(gapCandidates, skillById);
-  const mastered = requiredSkills
+  const mastered: Gap[] = requiredSkills
     .filter((item) => item.currentMastery >= masteryThreshold)
     .map((item) => ({
       ...item,
       reason: `${item.skill.name} has enough evidence for this role right now.`
     }));
 
-  return {
-    role,
-    readiness,
-    gaps,
-    mastered
-  };
+  return { role, readiness, gaps: topologicalGapOrder(gapCandidates, skillById), mastered };
 }
 
 export function prerequisitesSatisfied(
@@ -71,7 +65,9 @@ export function prerequisitesSatisfied(
   mastery: MasteryMap,
   threshold = PREREQUISITE_THRESHOLD
 ) {
-  return skillOrResource.prerequisites.every((skillId) => clampMastery(mastery[skillId] ?? 0) >= threshold);
+  return skillOrResource.prerequisites.every(
+    (skillId) => clampMastery(mastery[skillId] ?? 0) >= threshold
+  );
 }
 
 function topologicalGapOrder(gaps: Gap[], skillById: Map<string, Skill>) {
@@ -81,7 +77,9 @@ function topologicalGapOrder(gaps: Gap[], skillById: Map<string, Skill>) {
   while (pending.size > 0) {
     const ready = [...pending.values()]
       .filter((gap) =>
-        gap.skill.prerequisites.every((prereqId) => !pending.has(prereqId) || !skillById.has(prereqId))
+        gap.skill.prerequisites.every(
+          (prereqId) => !pending.has(prereqId) || !skillById.has(prereqId)
+        )
       )
       .sort((a, b) => b.importance - a.importance || a.skill.name.localeCompare(b.skill.name));
 
@@ -98,14 +96,38 @@ function topologicalGapOrder(gaps: Gap[], skillById: Map<string, Skill>) {
   return ordered;
 }
 
-function buildGapReason(skill: Skill, mastery: MasteryMap) {
-  const missingPrereqs = skill.prerequisites.filter((skillId) => clampMastery(mastery[skillId] ?? 0) < PREREQUISITE_THRESHOLD);
+/**
+ * Walks the whole prerequisite chain, not just the direct edges, so this agrees
+ * with the Cypher gate. Checking one level deep let a learner missing a
+ * grandparent skill be told the skill was "unlocked" while the gate still
+ * filtered out every resource for it.
+ */
+function transitivePrerequisites(skill: Skill, skillById: Map<string, Skill>): string[] {
+  const collected = new Set<string>();
+  const stack = [...skill.prerequisites];
 
-  if (missingPrereqs.length > 0) {
-    return `Build prerequisite evidence first: ${missingPrereqs.join(", ")}.`;
+  while (stack.length > 0) {
+    const id = stack.pop()!;
+
+    if (collected.has(id)) {
+      continue;
+    }
+
+    collected.add(id);
+    stack.push(...(skillById.get(id)?.prerequisites ?? []));
   }
 
-  return `${skill.name} is unlocked and below the target mastery threshold.`;
+  return [...collected];
+}
+
+function buildGapReason(skill: Skill, skillById: Map<string, Skill>, mastery: MasteryMap) {
+  const missing = transitivePrerequisites(skill, skillById)
+    .filter((skillId) => clampMastery(mastery[skillId] ?? 0) < PREREQUISITE_THRESHOLD)
+    .map((skillId) => skillById.get(skillId)?.name ?? skillId);
+
+  return missing.length > 0
+    ? `Build prerequisite evidence first: ${missing.join(", ")}.`
+    : `${skill.name} is unlocked and below the target mastery threshold.`;
 }
 
 function clampMastery(value: number) {

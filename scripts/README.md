@@ -1,16 +1,11 @@
 # Scripts
 
-Utility scripts for development and deployment.
+- `verify-gate.ts` — asserts the prerequisite gate against the live Neo4j
+  database. The gate is a Cypher traversal, so vitest cannot reach it; this is
+  the test that covers it.
 
-## Contents
-
-- `setup.sh` - Initial project setup
-- `seed-db.py` - Seed database with sample data
-- `deploy.sh` - Deployment script
-
-## Usage
-
-Make scripts executable before running:
 ```bash
-chmod +x scripts/*.sh
+npm run graph:verify    # needs .env with NEO4J_* set, and a seeded graph
 ```
+
+Seeding lives in [`seed/`](../seed) and is driven by `npm run db:seed:all`.

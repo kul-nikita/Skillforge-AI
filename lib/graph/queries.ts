@@ -3,8 +3,7 @@ import type { Domain, MasteryMap, Role, Skill, SkillGraph } from "@/lib/types";
 
 /**
  * All sequencing structure is read from Neo4j at request time. The traversals
- * that matter — transitive prerequisites and transitive dependents — run as
- * variable-length Cypher patterns, not as recursion in application code.
+ * that matter run as variable-length Cypher patterns, not as recursion here.
  */
 
 export async function listDomains(): Promise<Domain[]> {
@@ -87,28 +86,7 @@ export async function getSkillsByIds(skillIds: string[]): Promise<Skill[]> {
   );
 }
 
-/**
- * Prerequisite validation as a graph traversal: walks the full transitive
- * prerequisite chain and filters by the learner's mastery inside Cypher.
- * Returns the skill ids that are still unmet.
- */
-export async function findUnmetPrerequisites(
-  skillId: string,
-  mastery: MasteryMap,
-  threshold = 0.6
-): Promise<string[]> {
-  const rows = await runQuery<{ unmet: string[] }>(
-    `MATCH (target:Skill {id: $skillId})
-     OPTIONAL MATCH (prereq:Skill)-[:PREREQUISITE_OF*1..]->(target)
-     WITH collect(DISTINCT prereq.id) AS prereqIds
-     RETURN [p IN prereqIds WHERE p IS NOT NULL AND coalesce($mastery[p], 0.0) < $threshold] AS unmet`,
-    { skillId, mastery, threshold }
-  );
-
-  return rows[0]?.unmet ?? [];
-}
-
-/** Transitive dependents — one traversal instead of a breadth-first search in TS. */
+/** Transitive dependents, in one traversal. */
 export async function findDownstreamSkills(skillId: string): Promise<string[]> {
   const rows = await runQuery<{ downstream: string[] }>(
     `MATCH (s:Skill {id: $skillId})
@@ -127,10 +105,9 @@ export type ResourceGateResult = {
 };
 
 /**
- * The gate applied to candidates that arrived from anywhere other than a tag
- * match — notably Qdrant. Returns each resource with the prerequisites the
- * learner is still missing, so the UI can explain *why* something is blocked
- * instead of silently dropping it.
+ * The gate for candidates that arrived from anywhere but a tag match (Qdrant).
+ * Returns what each resource is still missing, so the UI can say why something
+ * is blocked instead of silently dropping it.
  */
 export async function gateResources(
   resourceIds: string[],
@@ -142,17 +119,15 @@ export async function gateResources(
   }
 
   return runQuery<ResourceGateResult>(
-    // `toString(p)` is not cosmetic: Cypher infers a list comprehension's
-    // element type from its WHERE predicate, so a list built this way is typed
-    // as LIST<BOOLEAN> and is rejected as a map key even though it holds
-    // strings at runtime. toString() restores the static type.
-    // A resource is gated on its own REQUIRES_SKILL edges *and* on the full
-    // prerequisite chain of whatever it TEACHES. Without the second half a row
-    // that simply declares no prerequisites would bypass the skill graph
-    // entirely — the catalog would be able to unlock a skill, which is exactly
-    // what the graph is meant to prevent. Skills the resource itself teaches
-    // are excluded, so a resource covering both a skill and its prerequisite
-    // does not block itself.
+    // Gated on the resource's own REQUIRES_SKILL edges *and* the full
+    // prerequisite chain of whatever it TEACHES. Without the second half, a row
+    // declaring no prerequisites bypasses the graph entirely — the catalog could
+    // unlock a skill. Skills the resource teaches are excluded so it cannot
+    // block itself.
+    //
+    // `toString(p)` is load-bearing: Cypher infers a list comprehension's
+    // element type from its WHERE predicate, so the list is typed LIST<BOOLEAN>
+    // and rejected as a map key even though it holds strings at runtime.
     `MATCH (res:Resource) WHERE res.id IN $resourceIds
      OPTIONAL MATCH (res)-[:TEACHES]->(taught:Skill)
      WITH res, collect(DISTINCT taught.id) AS teaches
@@ -170,18 +145,14 @@ export async function gateResources(
   );
 }
 
-/**
- * Resource ids that teach a skill AND whose own prerequisites the learner has
- * met — the graph gate every candidate must pass before scoring.
- */
+/** The gate every candidate passes before scoring: teaches the skill, prerequisites met. */
 export async function findPrerequisiteValidResourceIds(
   skillId: string,
   mastery: MasteryMap,
   threshold = 0.6
 ): Promise<string[]> {
   const rows = await runQuery<{ resourceIds: string[] }>(
-    // Same rule as `gateResources`: the resource's own prerequisites plus the
-    // transitive prerequisites of the skill being learned.
+    // Same rule as `gateResources` — see the note on `toString(p)` there.
     `MATCH (res:Resource)-[:TEACHES]->(target:Skill {id: $skillId})
      OPTIONAL MATCH (res)-[:TEACHES]->(taught:Skill)
      WITH res, target, collect(DISTINCT taught.id) AS teaches

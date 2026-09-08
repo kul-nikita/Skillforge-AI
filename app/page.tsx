@@ -63,9 +63,8 @@ const CAREER_ICONS = [
   Palette,
 ];
 
-// Counted from the seeded graph at request time. These were hardcoded as
-// "12+ / 48+ / 1200+" against real numbers of 9 / 19 / 96 — a judge who counts
-// the domains on this same page would have caught it.
+// Counted from the seeded graph at request time. Hardcoding them is how this
+// page ends up contradicting its own footer.
 function statsFor(domains: number, roles: number, skills: number) {
   return [
     { value: String(domains), label: "Learning Domains", icon: Layers3 },
@@ -87,19 +86,15 @@ export default async function LandingPage() {
   const displayedRoles = roles.slice(0, 5);
   const stats = statsFor(domains.length, roles.length, graph.skills.length);
 
-  // The hero diagram used to hardcode a made-up path ("React Fundamentals",
-  // "96% match"). Those skills and that number existed nowhere in the product,
-  // which is exactly the claim this page is trying to disprove. Sourced from the
-  // seeded graph instead, so the illustration cannot drift from the real planner.
+  // Sourced from the seeded graph, so the hero illustration cannot drift from
+  // what the planner actually does.
   const heroChain = pickChain(graph.skills, 4);
-  // ...and the goal above it named a role ("Full-Stack Developer") that is not
-  // seeded either. Pick a real role that actually requires the last skill shown.
+  // A real role that actually requires the last skill in the chain.
   const heroGoal =
     roles.find((role) =>
       role.requiredSkills.some((required) => required.skillId === heroChain.at(-1)?.id)
     ) ?? roles[0];
-  // The landing page is public and renders before any store is guaranteed
-  // healthy, so an empty graph must degrade to a quiet panel, not a 500.
+  // Public page: an empty or unreachable graph degrades to a quiet panel, not a 500.
   const heroSteps = heroChain.map((skill, index) => ({
     n: index === 0 ? "✓" : index === 1 ? "→" : String(index + 1),
     title: skill.name,

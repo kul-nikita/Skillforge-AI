@@ -24,7 +24,7 @@ const STATUS_CONFIG = {
   missing: { color: "text-red-300", bg: "bg-red-500", icon: X }
 };
 
-export function MatchScoreCard({ roleId }: { roleId: string }) {
+export function MatchScoreCard() {
   const [jdText, setJdText] = useState("");
   const [result, setResult] = useState<MatchResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -38,7 +38,6 @@ export function MatchScoreCard({ roleId }: { roleId: string }) {
     setResult(null);
 
     try {
-      // First parse the JD to get the job title
       const parseRes = await fetch("/api/jd/parse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -53,12 +52,8 @@ export function MatchScoreCard({ roleId }: { roleId: string }) {
 
       const parseData = await parseRes.json();
 
-      // Then compute the role match score
-      const matchRes = await fetch("/api/match-score", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ roleId })
-      });
+      // The role comes from the session profile, server-side.
+      const matchRes = await fetch("/api/match-score", { method: "POST" });
 
       if (!matchRes.ok) {
         const body = await matchRes.json().catch(() => ({}));

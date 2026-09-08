@@ -2,10 +2,15 @@
   "name": "skillforge-ai",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "graph:seed": "tsx --env-file=.env seed/graph/seed.ts",
     "mongo:seed": "tsx --env-file=.env seed/mongo/seed.ts",

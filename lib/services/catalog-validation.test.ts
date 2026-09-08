@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  checkUrl,
   isAllowedHost,
+  isSafeFetchTarget,
   normalizeHost,
   structuralIssues
 } from "@/lib/services/catalog-validation";
@@ -74,5 +76,49 @@ describe("structural rules", () => {
   it("rejects nonsense duration and quality", () => {
     expect(structuralIssues({ ...base, durationMinutes: 0 }, known).length).toBe(1);
     expect(structuralIssues({ ...base, qualityScore: 1.5 }, known).length).toBe(1);
+  });
+});
+
+/**
+ * The admin form makes the *server* fetch a URL someone typed, and
+ * `allowNewDomain` deliberately waives the host allowlist — so this is the only
+ * thing keeping it from being an SSRF probe of the deployment's own network.
+ */
+describe("isSafeFetchTarget", () => {
+  it("allows ordinary public http(s) URLs", () => {
+    expect(isSafeFetchTarget("https://learn.microsoft.com/en-us/training/")).toBe(true);
+    expect(isSafeFetchTarget("http://example.com/path?q=1")).toBe(true);
+    expect(isSafeFetchTarget("https://8.8.8.8/")).toBe(true);
+  });
+
+  it("blocks non-http schemes", () => {
+    expect(isSafeFetchTarget("file:///etc/passwd")).toBe(false);
+    expect(isSafeFetchTarget("ftp://example.com/x")).toBe(false);
+    expect(isSafeFetchTarget("not a url")).toBe(false);
+  });
+
+  it("blocks loopback and internal names", () => {
+    expect(isSafeFetchTarget("http://localhost:3000/")).toBe(false);
+    expect(isSafeFetchTarget("http://db.internal/")).toBe(false);
+    expect(isSafeFetchTarget("http://printer.local/")).toBe(false);
+    expect(isSafeFetchTarget("http://[::1]/")).toBe(false);
+  });
+
+  it("blocks private and link-local address ranges", () => {
+    for (const host of ["127.0.0.1", "10.0.0.5", "172.16.4.4", "192.168.1.1", "100.64.0.1", "0.0.0.0"]) {
+      expect(isSafeFetchTarget(`http://${host}/`)).toBe(false);
+    }
+  });
+
+  it("blocks the cloud metadata endpoint", () => {
+    expect(isSafeFetchTarget("http://169.254.169.254/latest/meta-data/")).toBe(false);
+  });
+
+  it("checkUrl refuses without making the request", async () => {
+    const result = await checkUrl("http://169.254.169.254/latest/meta-data/");
+
+    expect(result.ok).toBe(false);
+    expect(result.status).toBeNull();
+    expect(result.detail).toMatch(/local or private/);
   });
 });

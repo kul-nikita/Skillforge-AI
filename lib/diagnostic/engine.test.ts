@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { roles } from "@/lib/data/demo-catalog";
+import { roles } from "@/lib/data/domains/cybersecurity";
 import { allRoles } from "@/seed/data";
 import { questionBank } from "@/lib/diagnostic/questions";
 import {

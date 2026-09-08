@@ -1,8 +1,8 @@
 import type { Domain, LearningResource, Role, Skill, SkillGraph } from "@/lib/types";
+import type { DomainBundle } from "@/lib/data/catalog-helpers";
 
 /**
- * Second domain. It exists to prove the engine is domain-agnostic: nothing here
- * is imported by lib/ at runtime, and adding it required no change to the
+ * Proof the engine is domain-agnostic: adding this needed no change to the
  * planner, scoring, diagnostic engine, or graph queries — only data.
  *
  * Every URL below returned HTTP 200 on 2026-08-26 (see `lastVerifiedAt`).
@@ -772,3 +772,10 @@ export const learningResources: LearningResource[] = [
     description: "Power, sample size, and the peeking problem, with calculators for each test type."
   }
 ];
+
+export const dataAnalytics: DomainBundle = {
+  domain,
+  roles,
+  skills: skillGraph.skills,
+  resources: learningResources
+};

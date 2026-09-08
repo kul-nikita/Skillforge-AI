@@ -1,29 +1,11 @@
 # Documentation
 
-Project documentation and architecture decisions.
+| | |
+|---|---|
+| [`PRODUCT_SPEC.md`](PRODUCT_SPEC.md) | Pitch, personas, example roadmap |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Data model, scoring math, adaptation logic, resource sourcing |
+| [`BUILD_PLAN.md`](BUILD_PLAN.md) | Day-by-day plan, demo script, judging alignment |
+| [`DEPLOYMENT.md`](DEPLOYMENT.md) | Pipeline, environment variables, serverless notes |
 
-## Structure
-
-- `architecture/` - System architecture diagrams and descriptions
-- `api/` - API documentation
-- `decisions/` - Architecture Decision Records (ADRs)
-
-## Architecture Decision Records (ADRs)
-
-When making significant technical decisions, create an ADR in `decisions/` using the format:
-
-```markdown
-# ADR-NNN: Decision Title
-
-## Status
-Accepted/Rejected/Superseded
-
-## Context
-What is the issue?
-
-## Decision
-What was decided?
-
-## Consequences
-What are the implications?
-```
+The working agreement, the non-negotiable product rules, and the running status
+log live in [`../CLAUDE.md`](../CLAUDE.md).

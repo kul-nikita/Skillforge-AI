@@ -2,11 +2,10 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 const ALGORITHM = "sha256";
 
-// Falls back like GEMINI_API_KEY does, rather than throwing like MONGODB_URI:
-// a missing secret must not break the learn -> prove loop for a local or demo
-// deployment. Signatures stay internally consistent (mint and verify use the
-// same value), they are just not secret. Set EVIDENCE_SIGNING_SECRET in any
-// deployment where a shared evidence link needs to be unforgeable.
+// Falls back rather than throwing: a missing secret must not break the
+// learn -> prove loop locally. Signatures stay internally consistent, they are
+// just not unforgeable. Set EVIDENCE_SIGNING_SECRET wherever a shared evidence
+// link has to mean something.
 const DEV_FALLBACK_SECRET = "skillforge-dev-evidence-signing-secret";
 let warnedAboutFallback = false;
 
@@ -25,10 +24,7 @@ function getSecret(): string {
   return DEV_FALLBACK_SECRET;
 }
 
-/**
- * Serialize evidence fields into a canonical string for signing.
- * Fields are in alphabetical order to ensure consistent hashing.
- */
+/** Canonical form for signing: field order fixed here, not by object literal order. */
 export function serializeEvidence(data: {
   id: string;
   skillId: string;
@@ -53,10 +49,7 @@ export function serializeEvidence(data: {
   });
 }
 
-/**
- * Sign evidence data using HMAC-SHA256.
- * Returns a hex-encoded signature.
- */
+/** HMAC-SHA256 over the canonical form, hex encoded. */
 export function signEvidence(data: {
   id: string;
   skillId: string;
@@ -73,10 +66,7 @@ export function signEvidence(data: {
   return createHmac(ALGORITHM, secret).update(payload).digest("hex");
 }
 
-/**
- * Verify an evidence signature.
- * Uses constant-time comparison to prevent timing attacks.
- */
+/** Constant-time comparison, so a signature cannot be guessed byte by byte. */
 export function verifyEvidenceSignature(
   data: {
     id: string;
@@ -104,4 +94,78 @@ export function verifyEvidenceSignature(
   } catch {
     return false;
   }
+}
+
+/**
+ * Short-lived signed tokens meaning "the server issued exactly these questions".
+ * Both graded flows would otherwise take the questions from the request body,
+ * which lets a learner grade themselves. There is no per-attempt server state,
+ * so the server signs what it handed out and demands it back.
+ */
+function b64url(value: string): string {
+  return Buffer.from(value, "utf8").toString("base64url");
+}
+
+export function issueToken(claims: Record<string, unknown>, ttlMs: number): string {
+  const body = b64url(JSON.stringify({ ...claims, exp: Date.now() + ttlMs }));
+  return `${body}.${createHmac(ALGORITHM, getSecret()).update(body).digest("hex")}`;
+}
+
+/** Returns the claims, or null if the token is forged, malformed or expired. */
+export function readToken(token: string): Record<string, unknown> | null {
+  const [body, signature] = token.split(".");
+
+  if (!body || !signature) {
+    return null;
+  }
+
+  const expected = createHmac(ALGORITHM, getSecret()).update(body).digest("hex");
+  const given = Buffer.from(signature, "hex");
+  const want = Buffer.from(expected, "hex");
+
+  if (given.length !== want.length || !timingSafeEqual(given, want)) {
+    return null;
+  }
+
+  try {
+    const claims = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+    if (typeof claims !== "object" || claims === null || typeof claims.exp !== "number") {
+      return null;
+    }
+    return claims.exp < Date.now() ? null : claims;
+  } catch {
+    return null;
+  }
+}
+
+/** Stable fingerprint of a question set, so graded questions are the issued ones. */
+export function fingerprint(values: string[]): string {
+  return createHmac(ALGORITHM, getSecret()).update(JSON.stringify(values)).digest("hex").slice(0, 32);
+}
+
+/**
+ * True when the token is ours, unexpired, and carries exactly these claims.
+ * Arrays must match element for element: that is what stops a learner
+ * submitting only the questions they got right.
+ */
+export function tokenMatches(token: string, expected: Record<string, string | string[]>): boolean {
+  const claims = readToken(token);
+
+  if (!claims) {
+    return false;
+  }
+
+  return Object.entries(expected).every(([key, value]) => {
+    const actual = claims[key];
+
+    if (Array.isArray(value)) {
+      return (
+        Array.isArray(actual) &&
+        actual.length === value.length &&
+        actual.every((item, index) => String(item) === value[index])
+      );
+    }
+
+    return actual === value;
+  });
 }

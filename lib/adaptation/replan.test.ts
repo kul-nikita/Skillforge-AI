@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { learningResources, roles, skillGraph } from "@/lib/data/demo-catalog";
+import { learningResources, roles, skillGraph } from "@/lib/data/domains/cybersecurity";
 import { planRoadmap } from "@/lib/planner/roadmap";
 import {
   adjustPreferencesFromFeedback,
   applyAssessmentOutcome,
-  downstreamSkills,
   planWeek
 } from "@/lib/adaptation/replan";
 import { scoreResourcesForGap } from "@/lib/scoring/recommendations";
@@ -23,6 +22,10 @@ const mastery = {
 };
 const preferences: LearnerPreferences = { maxHoursPerStep: 4, cost: "free", format: "lab" };
 const gaps = planRoadmap({ role: socAnalyst, graph: skillGraph, mastery }).gaps;
+
+// alert-triage depends on siem-querying, which depends on log-analysis. At
+// runtime this list comes from Cypher (findDownstreamSkills).
+const DOWNSTREAM_OF_LOG_ANALYSIS = ["siem-querying", "alert-triage"];
 
 /** Mirrors what lib/services does at runtime: score first, then pack. */
 function candidatesFor(weeklyHours: number) {
@@ -89,7 +92,7 @@ describe("weekly replanning", () => {
     const outcome = applyAssessmentOutcome({
       skillId: "log-analysis",
       assessmentScore: 0.4,
-      downstreamSkillIds: downstreamSkills(skillGraph, "log-analysis"),
+      downstreamSkillIds: DOWNSTREAM_OF_LOG_ANALYSIS,
       candidateResources: learningResources,
       mastery
     });
@@ -112,23 +115,9 @@ describe("weekly replanning", () => {
   });
 });
 
-describe("downstreamSkills", () => {
-  it("finds transitive dependents, not just direct ones", () => {
-    const downstream = downstreamSkills(skillGraph, "log-analysis");
-
-    expect(downstream).toContain("siem-querying");
-    // alert-triage depends on siem-querying, which depends on log-analysis.
-    expect(downstream).toContain("alert-triage");
-  });
-
-  it("returns nothing for a leaf skill", () => {
-    expect(downstreamSkills(skillGraph, "incident-documentation")).toEqual([]);
-  });
-});
-
 describe("assessment outcomes", () => {
   const args = {
-    downstreamSkillIds: downstreamSkills(skillGraph, "log-analysis"),
+    downstreamSkillIds: DOWNSTREAM_OF_LOG_ANALYSIS,
     candidateResources: learningResources,
     mastery
   };

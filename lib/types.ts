@@ -2,10 +2,7 @@ export type CostType = "free" | "paid" | "freemium";
 export type ResourceType = "course" | "lab" | "doc" | "project" | "video";
 export type Difficulty = "beginner" | "intermediate" | "advanced";
 
-/**
- * Domains are data, not code. Nothing in lib/ may hardcode a domain or role id
- * — the graph and catalog decide what exists.
- */
+/** Domains are data: nothing in lib/ may hardcode a domain or role id. */
 export type Domain = {
   id: string;
   name: string;
@@ -76,11 +73,9 @@ export type LearningStyle =
 export type LearnerProfile = {
   learnerId: string;
 
-  // Career direction
   targetRoleId: string;
   careerObjective: string;
 
-  // AI-extracted learner information
   experienceLevel: ExperienceLevel;
   currentSkills: string[];
   interests: string[];
@@ -88,7 +83,6 @@ export type LearnerProfile = {
   preferredTechnologies: string[];
   learningStyle: LearningStyle;
 
-  // Planning constraints
   timelineWeeks: number;
   weeklyHours: number;
   preferences: LearnerPreferences;
@@ -118,7 +112,7 @@ export type Evidence = {
   rubricScore: number;
   validatedCapabilities: string[];
   createdAt: string;
-  /** HMAC-SHA256 signature for tamper-proof verification. */
+  /** HMAC over the record's own fields, checked by /verify/<id>. */
   signature: string;
 };
 

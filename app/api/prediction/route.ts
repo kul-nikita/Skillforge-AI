@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/session";
 import { getProfile, getMastery, listEvents } from "@/lib/db/learners";
 import { getSkillGraph, getRole } from "@/lib/graph/queries";
-import { predictTimeline } from "@/lib/prediction/timeline";
+import { predictTimeline, readinessFor } from "@/lib/prediction/timeline";
 
 export const dynamic = "force-dynamic";
 
@@ -45,10 +45,6 @@ export async function GET() {
   return NextResponse.json({
     role: { id: role.id, title: role.title },
     prediction,
-    currentReadiness:
-      role.requiredSkills.reduce((sum, rs) => {
-        return sum + (mastery[rs.skillId] ?? 0) * rs.importance;
-      }, 0) /
-      role.requiredSkills.reduce((sum, rs) => sum + rs.importance, 0)
+    currentReadiness: readinessFor(role, mastery)
   });
 }

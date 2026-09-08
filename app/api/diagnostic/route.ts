@@ -27,9 +27,6 @@ const requestSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  // Every other route requires a session; this one used to allow anonymous
-  // callers for a try-before-signup flow that was never built, leaving an
-  // unauthenticated compute endpoint with no user. The UI always authenticates.
   let user;
   try {
     user = await requireUser();

@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    // 1. Qdrant widens the pool from free-text phrasing.
+    // Qdrant widens the pool from free-text phrasing.
     const hits = await searchResources(parsed.data.query, parsed.data.limit);
 
     if (hits.length === 0) {
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     const mastery = await getMastery(user.id);
     const ids = hits.map((hit) => hit.resourceId);
 
-    // 2. Neo4j decides what the learner is actually ready for. 3. Mongo supplies metadata.
+    // Neo4j decides what the learner is ready for; Mongo supplies the metadata.
     const [gates, resources, graph] = await Promise.all([
       gateResources(ids, mastery),
       findResourcesByIds(ids),
@@ -60,8 +60,8 @@ export async function POST(request: Request) {
         return {
           resource,
           similarity: Number(hit.similarity.toFixed(3)),
-          // Blocked items are shown with a reason rather than hidden, so the
-          // sequencing rule is visible instead of feeling like missing results.
+          // Blocked items are shown with a reason rather than hidden, so
+          // sequencing is visible instead of feeling like missing results.
           ready: gate.unmetPrerequisites.length === 0,
           unmetPrerequisites: gate.unmetPrerequisites.map((id) => skillName.get(id) ?? id),
           teaches: gate.teaches.map((id) => skillName.get(id) ?? id)
@@ -71,9 +71,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ results });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Search failed." },
-      { status: 502 }
-    );
+    console.error("[search] failed:", error instanceof Error ? error.message : error);
+    return NextResponse.json({ error: "Search is unavailable right now." }, { status: 502 });
   }
 }

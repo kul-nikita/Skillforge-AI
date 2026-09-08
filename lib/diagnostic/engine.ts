@@ -13,10 +13,7 @@ export type SubmittedAnswer = {
   selectedIndex: number;
 };
 
-/**
- * Grading happens here, server-side, so the answer key never reaches the
- * browser. An unknown questionId grades as incorrect rather than throwing.
- */
+/** Server-side, so the answer key never reaches the browser. Unknown ids grade as wrong. */
 export function gradeAnswers(submitted: SubmittedAnswer[]): DiagnosticAnswer[] {
   return submitted.map(({ questionId, selectedIndex }) => {
     const question = questionBank.find((candidate) => candidate.id === questionId);
@@ -103,10 +100,7 @@ export function estimateMastery(answers: DiagnosticAnswer[]): MasteryMap {
   return estimates;
 }
 
-/**
- * One event per skill carrying the ladder's estimate, so mastery still flows
- * through `deriveMasteryFromEvents` instead of being written directly.
- */
+/** One event per skill, so mastery is still derived from the log rather than written. */
 export function diagnosticEvents(learnerId: string, estimates: MasteryMap, timestamp: string): LearningEvent[] {
   return Object.entries(estimates).map(([skillId, score]) => ({
     learnerId,

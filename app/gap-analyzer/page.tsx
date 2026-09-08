@@ -36,7 +36,7 @@ export default async function GapAnalyzerPage() {
         </section>
 
         <div className="mx-auto max-w-4xl px-6 py-8">
-          <GapAnalysis roleId={profile.targetRoleId} />
+          <GapAnalysis />
         </div>
       </main>
     </>

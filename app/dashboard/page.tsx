@@ -58,7 +58,6 @@ export default async function DashboardPage() {
   const weeklyHours = profile?.weeklyHours ?? DEFAULT_WEEKLY_HOURS;
   const roadmap = await buildRoadmap(targetRoleId, mastery);
 
-  // Compute timeline prediction
   const role = roles.find((r) => r.id === targetRoleId);
   const timelineData = role
     ? predictTimeline({ profile, mastery, role, graph, events })

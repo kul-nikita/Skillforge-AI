@@ -5,11 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, Check, Download, Loader2, ShieldCheck, Trash2 } from "lucide-react";
 import { button, card } from "@/lib/ui";
 
-/**
- * The UI half of product rule 5. `/api/account` has always supported consent,
- * export and delete — there was simply no page that called it, so a learner
- * could not exercise any of those rights without curl.
- */
+/** The UI half of product rule 5: view, export, and delete everything we hold. */
 export function AccountPanel({
   email,
   initialConsent,

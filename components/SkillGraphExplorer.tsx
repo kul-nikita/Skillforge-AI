@@ -55,7 +55,7 @@ export function SkillGraphExplorer({ data }: { data: SkillGraphData }) {
   useEffect(() => {
     if (!containerRef.current || cyRef.current) return;
 
-    // Dynamic import for Cytoscape (client-only)
+    // Cytoscape touches the DOM, so it can only load in the browser.
     import("cytoscape").then((cytoscapeModule) => {
       const cytoscape = cytoscapeModule.default;
 
@@ -136,7 +136,6 @@ export function SkillGraphExplorer({ data }: { data: SkillGraphData }) {
 
       cyRef.current = cy;
 
-      // Click handler
       cy.on("tap", "node", (evt) => {
         const node = evt.target;
         const skillId = node.data("id");
@@ -147,7 +146,6 @@ export function SkillGraphExplorer({ data }: { data: SkillGraphData }) {
         setSelectedResources(resources);
       });
 
-      // Hover handlers for prerequisite highlighting
       cy.on("mouseover", "node", (evt) => {
         const node = evt.target;
         node.connectedEdges().addClass("highlighted");

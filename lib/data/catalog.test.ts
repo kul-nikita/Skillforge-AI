@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { demoEvidence } from "@/lib/data/demo-catalog";
+import { demoEvidence } from "@/lib/data/demo-learner";
 import { evidenceSchema, learningResourceSchema } from "@/lib/db/schemas";
 import { allResources, allRoles, allSkills, domains } from "@/seed/data";
 

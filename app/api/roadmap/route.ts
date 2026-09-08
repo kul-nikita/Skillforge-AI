@@ -9,15 +9,13 @@ export const dynamic = "force-dynamic";
 
 const requestSchema = z.object({
   targetRoleId: z.string().min(1),
-  // Preferences and weekly hours are optional for the same reason mastery is:
-  // the learner already stated them during onboarding, so requiring them in the
-  // body meant a caller who omitted them got a 400 instead of their own plan.
+  // Optional for the same reason mastery is: the learner stated them at
+  // onboarding, so requiring them in the body returns a 400 instead of a plan.
   preferences: preferencesSchema.optional(),
   weeklyHours: z.number().min(1).max(60).optional(),
-  // Optional: the diagnostic passes the mastery it just derived, which may not
-  // be persisted yet when the learner has not consented. Omitting it falls back
-  // to the signed-in learner's stored mastery rather than silently assuming
-  // zero, which used to report 0% readiness for a learner who had one.
+  // The diagnostic passes the mastery it just derived, which is not persisted
+  // when the learner has not consented. Omitting it falls back to stored
+  // mastery rather than assuming zero.
   mastery: z.record(z.number().min(0).max(1)).optional()
 });
 
@@ -56,9 +54,8 @@ export async function POST(request: Request) {
         : []
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Could not build roadmap." },
-      { status: 500 }
-    );
+    // Upstream messages can carry connection strings: log them, never return them.
+    console.error("[roadmap] failed:", error instanceof Error ? error.message : error);
+    return NextResponse.json({ error: "Could not build your roadmap right now." }, { status: 500 });
   }
 }

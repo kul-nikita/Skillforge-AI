@@ -10,15 +10,13 @@ import {
   completionEvidence,
   gradeCompletion
 } from "@/lib/services/completion";
-import { signEvidence } from "@/lib/crypto/signing";
+import { issueToken, tokenMatches } from "@/lib/crypto/signing";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Step 1 — hand the learner the post-check for a resource.
- *
- * Questions used by an earlier completion are excluded, which is why this reads
- * the learner's event log rather than just the bank.
+ * Step 1 — the post-check for a resource. Reads the event log because questions
+ * used by an earlier completion are excluded.
  */
 export async function GET(request: Request) {
   let user;
@@ -50,13 +48,24 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     resource: { id: resource.id, title: resource.title, evidenceType: resource.evidenceType },
-    questions
+    questions,
+    // Signed record of which questions were issued, to whom, for what. Without
+    // it the client chooses what it is graded on.
+    token: issueToken(
+      { k: "check", u: user.id, r: resource.id, q: questions.map((question) => question.id).sort() },
+      CHECK_TOKEN_TTL_MS
+    )
   });
 }
+
+/** Long enough to take the check, short enough to be worthless afterwards. */
+const CHECK_TOKEN_TTL_MS = 2 * 60 * 60 * 1000;
 
 const submitSchema = z.object({
   // learnerId comes from the session, never the body.
   resourceId: z.string().min(1),
+  /** Issued by GET. Proves these are the questions the server asked for. */
+  token: z.string().min(1),
   answers: z
     .array(z.object({ questionId: z.string(), selectedIndex: z.number().int().min(-1) }))
     .min(1),
@@ -80,7 +89,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { resourceId, answers, summary, artifactUrl } = parsed.data;
+  const { resourceId, token, answers, summary, artifactUrl } = parsed.data;
+  const submittedIds = [...new Set(answers.map((answer) => answer.questionId))].sort();
+
+  // The graded set must be the issued set: not a subset (drop the ones you got
+  // wrong), not a superset, not another learner's or another resource's.
+  if (!tokenMatches(token, { k: "check", u: user.id, r: resourceId, q: submittedIds })) {
+    return NextResponse.json(
+      { error: "That check has expired or does not match. Reload the post-check and try again." },
+      { status: 400 }
+    );
+  }
+
   const [resource] = await findResourcesByIds([resourceId]);
 
   if (!resource) {

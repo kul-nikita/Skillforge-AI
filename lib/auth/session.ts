@@ -3,8 +3,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db/mongo";
 import { findUserById, type User } from "@/lib/db/users";
+import { SESSION_COOKIE } from "@/lib/constants";
 
-export const SESSION_COOKIE = "sf_session";
 const SESSION_DAYS = 30;
 
 type SessionRecord = {
@@ -19,9 +19,8 @@ async function sessions() {
 }
 
 /**
- * Only a hash of the token is persisted, so a database leak does not hand an
- * attacker usable sessions. Server-side records (rather than a self-contained
- * JWT) mean logout and account deletion revoke immediately.
+ * Only a hash is persisted, so a database leak hands over no usable sessions.
+ * Server-side records rather than a JWT, so logout and deletion revoke at once.
  */
 function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
@@ -71,8 +70,7 @@ export async function requireUser(): Promise<User> {
 
 /**
  * For server components. Middleware only checks that a cookie exists, so a
- * revoked or forged cookie reaches the page — that must redirect to sign-in,
- * not surface a 500.
+ * revoked or forged one reaches the page and must redirect, not 500.
  */
 export async function requireUserOrRedirect(nextPath: string): Promise<User> {
   const user = await getCurrentUser();

@@ -36,7 +36,7 @@ export default async function MatchScorePage() {
         </section>
 
         <div className="mx-auto max-w-4xl px-6 py-8">
-          <MatchScoreCard roleId={profile.targetRoleId} />
+          <MatchScoreCard />
         </div>
       </main>
     </>

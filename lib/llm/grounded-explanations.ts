@@ -1,4 +1,5 @@
 import type { LearningResource, ScoreBreakdown } from "@/lib/types";
+import { geminiApiKey, geminiText } from "@/lib/llm/gemini";
 
 export type GroundedFacts = {
   resource: Pick<
@@ -10,14 +11,13 @@ export type GroundedFacts = {
   score: ScoreBreakdown;
 };
 
-const GEMINI_MODEL = "gemini-2.5-flash";
 
 /**
  * Product rule 1: the model explains, it never supplies ground truth. It is
  * given a closed set of facts and its output is then *checked* against them —
  * a prompt instruction alone is not a guarantee.
  */
-export function buildGroundedPrompt(facts: GroundedFacts) {
+function buildGroundedPrompt(facts: GroundedFacts) {
   return {
     system:
       "You write one short paragraph (max 45 words) explaining why a learning resource was recommended. " +
@@ -88,38 +88,19 @@ export async function generateGroundedExplanation(
   facts: GroundedFacts,
   fallback: string
 ): Promise<{ text: string; source: "llm" | "fallback"; violations: GroundingViolation[] }> {
-  const apiKey = process.env.GEMINI_API_KEY;
-
-  if (!apiKey) {
+  if (!geminiApiKey()) {
     return { text: fallback, source: "fallback", violations: [] };
   }
 
   const prompt = buildGroundedPrompt(facts);
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: prompt.system }] },
-          contents: [{ role: "user", parts: [{ text: prompt.user }] }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 40000 }
-        })
-      }
-    );
-
-    if (!response.ok) {
-      return { text: fallback, source: "fallback", violations: [] };
-    }
-
-    const payload = await response.json();
-    const text: unknown = payload?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (typeof text !== "string" || text.trim().length === 0) {
-      return { text: fallback, source: "fallback", violations: [] };
-    }
+    const text = await geminiText({
+      system: prompt.system,
+      user: prompt.user,
+      temperature: 0.2,
+      maxOutputTokens: 40000
+    });
 
     const cleaned = text.trim().replace(/\s+/g, " ");
     const violations = findGroundingViolations(cleaned, facts);

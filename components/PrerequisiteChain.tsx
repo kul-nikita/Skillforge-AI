@@ -2,12 +2,8 @@ import { Check, Lock } from "lucide-react";
 import type { Skill } from "@/lib/types";
 
 /**
- * A real prerequisite chain, drawn.
- *
- * The graph is the thing this product has that a course-list-with-a-chatbot
- * does not, and until now it was only ever rendered as ordered text. The skills
- * here come from the seeded graph, not from a hardcoded illustration, so this
- * cannot drift away from what the planner actually does.
+ * A real prerequisite chain, drawn. The skills come from the seeded graph rather
+ * than a hardcoded illustration, so it cannot drift from what the planner does.
  */
 export function PrerequisiteChain({ chain }: { chain: Skill[] }) {
   if (chain.length === 0) {
@@ -22,9 +18,9 @@ export function PrerequisiteChain({ chain }: { chain: Skill[] }) {
 
       <ol className="mt-4 space-y-0">
         {chain.map((skill, index) => {
-          // Everything before the last node is treated as met, so the diagram
-          // shows the moment that matters: the next skill is reachable only
-          // because what it depends on is already done.
+          // Everything before the last node reads as met, so the diagram shows
+          // the moment that matters: the next skill is reachable because its
+          // dependencies are done.
           const locked = index === chain.length - 1;
 
           return (

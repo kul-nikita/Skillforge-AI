@@ -187,6 +187,8 @@ the theme by using the tokens, not by carrying its own colours.
 
 ## Running it
 
+Node 20 or newer.
+
 ```bash
 npm install
 cp .env.example .env     # then fill it in — see the table below
@@ -201,6 +203,7 @@ npm run dev
 | `MONGODB_URI` | Full `mongodb+srv://` string. |
 | `NEO4J_URI` / `NEO4J_USER` / `NEO4J_PASSWORD` | AuraDB. |
 | `QDRANT_URL` / `QDRANT_API_KEY` | Qdrant Cloud. |
+| `EVIDENCE_SIGNING_SECRET` | HMAC key behind evidence signatures and the issued-question tokens. Optional — a well-known dev key is used when unset, so signatures verify but are not unforgeable. |
 | `ADMIN_EMAILS` | Comma-separated emails allowed into `/admin`. **Unset means nobody is an admin** — the catalog is read-only by default. |
 
 Seed order matters: vectors reference resource ids that must exist in Mongo
@@ -209,7 +212,8 @@ first.
 ### Other commands
 
 ```bash
-npm run test          # 112 unit tests — planner, scoring, grounding, catalog integrity, evidence signing
+npm run test          # 152 unit tests
+npm run typecheck
 npm run lint
 npm run build         # succeeds with no secrets; see below
 ```
@@ -235,6 +239,16 @@ The suite is not decorative — most of it exists because something broke.
 - `lib/diagnostic/engine.test.ts` asserts every seeded role has all three
   question tiers for every required skill — without it, a new domain would end
   the diagnostic early instead of failing loudly.
+- `lib/crypto/tokens.test.ts` covers the issued-question tokens that bind both
+  graded flows to what the server actually asked. The case that matters:
+  submitting a **subset** of the issued questions — answer four, send only the
+  one you got right — is rejected.
+- `lib/llm/gemini.test.ts` pins the retry policy (a 503 is retried, a 400 is
+  not) and that a short `scores` array from the grader is re-shaped rather than
+  rendered as `NaN%`.
+- `lib/services/catalog-validation.test.ts` covers the SSRF filter on the admin
+  URL check: `169.254.169.254` and other private targets are refused before any
+  request is made.
 
 ---
 
@@ -277,13 +291,6 @@ the team divided the work into:
 4. **Explainability + dashboard** — visualise paths and explain recommendations
 5. **Integration + adaptive feedback loop** — connect components, adapt on feedback
 
-> The repository root also contains `backend/`, `frontend/`, `contracts/`,
-> `mock-data/` and `scripts/` from the original scaffold, which planned a
-> separate FastAPI service and a separate frontend. **This branch does not use
-> them** — it is a single Next.js deployable, as described above. They are left
-> in place rather than deleted because they belong to the shared `main`
-> history.
-
 ---
 
 ## Known limitations
@@ -302,11 +309,26 @@ Kept here deliberately rather than left for someone to discover.
   than its title.
 - **Live discovery (layer 2) is not built.** The curated catalog is the only
   content source, which is what keeps the demo deterministic and offline-safe.
+- **The SSRF filter on the admin URL check tests literal addresses only.** A
+  hostname that *resolves* to a private address still gets through; closing that
+  needs a DNS lookup plus a pinned-IP fetch, which is only worth it if that form
+  stops being admin-only.
+- **The login throttle is keyed by email**, so someone who knows an address can
+  lock it for 15 minutes. Deliberate: per-IP only would hand a botnet unlimited
+  guesses.
+- **Nothing rate-limits the LLM routes per learner** beyond input size caps, so a
+  signed-in learner can spend API budget in a loop.
 - **The JD gap analyzer and verification interview need `GEMINI_API_KEY`** and
-  have no deterministic fallback (unlike explanations). A Gemini outage returns
-  the upstream error to the surface rather than degrading — those two features
+  have no deterministic fallback (unlike explanations). A Gemini outage is
+  retried and then surfaces as a 502 — those two features
   are simply unavailable while the key is missing or the model is down.
 - **`/verify/<id>` proves integrity, not provenance.** A valid signature means
   the record's fields are unchanged since mint; it does not attest that the
   learner did the work unaided — that assurance comes from the server-side
   grading, which the verify page does not re-run.
+
+---
+
+## License
+
+[MIT](LICENSE).

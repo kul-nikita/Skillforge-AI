@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-
-const SESSION_COOKIE = "sf_session";
+import { SESSION_COOKIE } from "@/lib/constants";
 
 /**
  * Middleware runs on the Edge runtime, so it cannot reach Mongo to validate a
@@ -27,5 +26,8 @@ export const config = {
     "/diagnostic/:path*",
     "/account/:path*",
     "/onboarding/:path*",
+    "/gap-analyzer/:path*",
+    "/match-score/:path*",
+    "/graph/:path*",
     "/admin/:path*"]
 };

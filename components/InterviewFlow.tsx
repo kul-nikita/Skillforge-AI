@@ -30,6 +30,7 @@ export function InterviewFlow({
 }) {
   const [step, setStep] = useState<"intro" | "questions" | "submitting" | "results">("intro");
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [token, setToken] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [currentQ, setCurrentQ] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -57,6 +58,7 @@ export function InterviewFlow({
 
       const data = await res.json();
       setQuestions(data.questions);
+      setToken(data.token);
       setStep("questions");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate questions");
@@ -100,7 +102,8 @@ export function InterviewFlow({
           answers: answerArray,
           resourceId,
           skillId,
-          summary: summary || `Completed verification interview for ${skillName}`
+          token,
+          summary: summary.trim() || `Completed verification interview for ${skillName}`
         })
       });
 
@@ -223,6 +226,24 @@ export function InterviewFlow({
             />
           </div>
 
+          {/* Evidence summary — collected BEFORE grading, because the grade
+              response is what mints the evidence record. */}
+          {currentQ === questions.length - 1 && (
+            <div className="mt-6">
+              <label className="text-sm font-medium text-ink" htmlFor="interview-summary">
+                Brief summary for your evidence record (optional):
+              </label>
+              <textarea
+                id="interview-summary"
+                className="mt-2 w-full rounded-md border border-border bg-canvas p-3 text-sm text-ink placeholder:text-muted focus:border-teal focus:outline-none focus:ring-1 focus:ring-teal"
+                rows={2}
+                placeholder={`Describe what you demonstrated about ${skillName}...`}
+                value={summary}
+                onChange={(e) => setSummary(e.target.value)}
+              />
+            </div>
+          )}
+
           {/* Navigation */}
           <div className="mt-6 flex items-center justify-between">
             <button
@@ -342,22 +363,6 @@ export function InterviewFlow({
               </div>
             ))}
           </div>
-
-          {/* Summary input for evidence */}
-          {grading.overall >= 0.5 && (
-            <div className="mt-6">
-              <label className="text-sm font-medium text-ink">
-                Brief summary for your evidence record:
-              </label>
-              <textarea
-                className="mt-2 w-full rounded-md border border-border bg-canvas p-3 text-sm text-ink placeholder:text-muted focus:border-teal focus:outline-none focus:ring-1 focus:ring-teal"
-                rows={2}
-                placeholder={`Describe what you demonstrated in this interview about ${skillName}...`}
-                value={summary}
-                onChange={(e) => setSummary(e.target.value)}
-              />
-            </div>
-          )}
 
           {/* Actions */}
           <div className="mt-6 flex gap-3">

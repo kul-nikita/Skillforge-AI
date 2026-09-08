@@ -76,7 +76,9 @@ export async function addEvidence(record: Omit<Evidence, "id" | "signature">): P
   const id = randomUUID();
   const signature = signEvidence({ ...record, id });
   const withIdAndSignature: Evidence = { ...record, id, signature };
-  await evidence.insertOne(withIdAndSignature);
+  // Spread on the way in: the driver stamps `_id` onto the object it is given,
+  // and this one is returned straight to the client.
+  await evidence.insertOne({ ...withIdAndSignature });
   return withIdAndSignature;
 }
 

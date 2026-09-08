@@ -1,17 +1,12 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { requireUser } from "@/lib/auth/session";
 import { computeRoleMatchScore } from "@/lib/llm/jd-parsing";
 import { getSkillGraph, getRole } from "@/lib/graph/queries";
-import { getMastery } from "@/lib/db/learners";
+import { getMastery, getProfile } from "@/lib/db/learners";
 
 export const dynamic = "force-dynamic";
 
-const requestSchema = z.object({
-  roleId: z.string().min(1)
-});
-
-export async function POST(request: Request) {
+export async function POST() {
   let user;
   try {
     user = await requireUser();
@@ -19,12 +14,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
 
-  const parsed = requestSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  }
+  // Scored against the learner's own target role, read from the session
+  // profile — never a role id handed in by the caller.
+  const roleId = (await getProfile(user.id))?.targetRoleId;
 
-  const { roleId } = parsed.data;
+  if (!roleId) {
+    return NextResponse.json(
+      { error: "No target role set. Complete onboarding first." },
+      { status: 400 }
+    );
+  }
 
   const [role, graph, mastery] = await Promise.all([
     getRole(roleId),

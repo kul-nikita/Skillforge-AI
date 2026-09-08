@@ -2,13 +2,9 @@ import { allResources } from "@/seed/data";
 import type { LearningResource } from "@/lib/types";
 
 /**
- * Rule 7: resource sourcing stays inside a domain allowlist.
- *
- * The list is derived from the hosts already represented in the curated
- * catalog, plus the sources named in docs/ARCHITECTURE.md#resource-sourcing.
- * Hardcoding a short list would be wrong — 225 curated rows already span 112
- * hosts — and skipping the check entirely would turn the admin form into
- * general open-web ingestion, which the scope rules forbid.
+ * Product rule 7: sourcing stays inside an allowlist. The allowlist is the
+ * hosts already in the curated catalog plus these, named in
+ * docs/ARCHITECTURE.md#resource-sourcing.
  */
 const ARCHITECTURE_SOURCES = [
   "portswigger.net",
@@ -30,7 +26,7 @@ export function normalizeHost(url: string): string {
 
 let cached: Set<string> | null = null;
 
-export function allowedHosts(): Set<string> {
+function allowedHosts(): Set<string> {
   cached ??= new Set([
     ...allResources.map((resource) => normalizeHost(resource.url)),
     ...ARCHITECTURE_SOURCES
@@ -48,16 +44,7 @@ export function isAllowedHost(url: string): boolean {
 
 export type ValidationIssue = { field: string; message: string };
 
-/**
- * The structural rules, as pure functions over the row plus the ids that
- * actually exist in the graph.
- *
- * Every rule here corresponds to a defect that was found by hand during the
- * build — a skill listed as both taught and required (twice), a duplicated
- * URL (three times), and a tag naming a skill that does not exist. The admin
- * form is the place they can be reintroduced, so it is the place they get
- * checked.
- */
+/** Catalog rules the admin form must not be able to reintroduce. */
 export function structuralIssues(
   resource: LearningResource,
   knownSkillIds: string[]
@@ -81,8 +68,8 @@ export function structuralIssues(
     }
   }
 
-  // A row that requires what it teaches can never be recommended for that gap:
-  // the gate filters it out precisely when the learner needs it.
+  // A row requiring what it teaches can never be recommended for that gap: the
+  // gate filters it out precisely when the learner needs it.
   for (const skillId of resource.prerequisites) {
     if (resource.skillTags.includes(skillId)) {
       issues.push({
@@ -105,12 +92,62 @@ export function structuralIssues(
 
 export type UrlCheck = { ok: boolean; status: number | null; detail: string };
 
+const PRIVATE_HOSTNAMES = /^(localhost|.*\.localhost|.*\.local|.*\.internal)$/i;
+
 /**
- * Rule 8 says every seeded row needs a real, working URL. That has been a
- * hand-verification rule enforced by curl and discipline — one confabulated URL
- * and eleven dead ones were caught that way. Here it becomes machine-enforced:
- * the server fetches the URL itself and refuses to store a row it could not
- * reach, so `lastVerifiedAt` records a check that actually happened.
+ * `checkUrl` makes the server fetch a URL someone typed, and `allowNewDomain`
+ * waives the host allowlist — so without this it is an SSRF primitive aimed at
+ * the deployment's own network (cloud metadata on 169.254.169.254).
+ *
+ * Literal addresses only: a hostname that *resolves* to a private address still
+ * gets through. Closing that needs a DNS lookup plus a pinned-IP fetch, which is
+ * only worth it if this stops being admin-only.
+ */
+export function isSafeFetchTarget(url: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return false;
+  }
+
+  const hostname = parsed.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+
+  if (PRIVATE_HOSTNAMES.test(hostname)) {
+    return false;
+  }
+
+  // IPv6 loopback / link-local / unique-local.
+  if (hostname === "::1" || /^(fe80|fc|fd)/.test(hostname)) {
+    return false;
+  }
+
+  const ipv4 = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!ipv4) {
+    return true;
+  }
+
+  const [a, b] = ipv4.slice(1).map(Number);
+  return !(
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 169 && b === 254) || // link-local, incl. cloud metadata
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    a >= 224
+  );
+}
+
+/**
+ * Every catalog row needs a URL that actually resolves, so the server fetches it
+ * rather than trusting the form. `lastVerifiedAt` then records a check that
+ * really happened.
  */
 export async function checkUrl(url: string, timeoutMs = 10_000): Promise<UrlCheck> {
   const attempt = async (method: "HEAD" | "GET") => {
@@ -129,9 +166,17 @@ export async function checkUrl(url: string, timeoutMs = 10_000): Promise<UrlChec
     }
   };
 
+  if (!isSafeFetchTarget(url)) {
+    return {
+      ok: false,
+      status: null,
+      detail: "Only public http(s) URLs can be verified — that host is local or private."
+    };
+  }
+
   try {
-    // HEAD first because it is cheap; a fair number of docs hosts reject it,
-    // so fall through to GET rather than recording a false failure.
+    // HEAD is cheap, but a fair number of docs hosts reject it — fall through
+    // to GET rather than recording a false failure.
     let response = await attempt("HEAD");
     if (response.status === 405 || response.status === 403 || response.status === 501) {
       response = await attempt("GET");

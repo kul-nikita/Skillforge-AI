@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/session";
-import { generateInterviewQuestions, gradeInterviewAnswers, type InterviewQuestion } from "@/lib/llm/interview";
+import {
+  generateInterviewQuestions,
+  gradeInterviewAnswers,
+  interviewAnswerSchema,
+  interviewQuestionSchema
+} from "@/lib/llm/interview";
 import { findResourcesByIds } from "@/lib/db/resources";
 import { getSkillsByIds } from "@/lib/graph/queries";
 import { addEvidence } from "@/lib/db/learners";
-import { signEvidence } from "@/lib/crypto/signing";
+import { fingerprint, issueToken, tokenMatches } from "@/lib/crypto/signing";
+import { GeminiError } from "@/lib/llm/gemini";
 
 export const dynamic = "force-dynamic";
 
@@ -15,25 +21,35 @@ const generateSchema = z.object({
 });
 
 const gradeSchema = z.object({
-  questions: z.array(z.object({
-    id: z.string(),
-    question: z.string(),
-    context: z.string()
-  })),
-  answers: z.array(z.object({
-    questionId: z.string(),
-    answer: z.string().min(10)
-  })),
+  questions: z.array(interviewQuestionSchema).min(1).max(10),
+  answers: z.array(interviewAnswerSchema).min(1).max(10),
   resourceId: z.string().min(1),
   skillId: z.string().min(1),
-  summary: z.string().min(10).max(1000)
+  summary: z.string().min(10).max(1000),
+  /** Issued alongside the questions; proves the model wrote them, not the learner. */
+  token: z.string().min(1)
 });
 
 const EVIDENCE_THRESHOLD = 0.5;
+const INTERVIEW_TOKEN_TTL_MS = 2 * 60 * 60 * 1000;
 
-/**
- * POST /api/interview - Generate questions or grade answers
- */
+/** What the token commits to: these exact questions, for this learner and skill. */
+function questionsFingerprint(questions: Array<{ id: string; question: string }>) {
+  return fingerprint(questions.map((question) => `${question.id}::${question.question}`));
+}
+
+function llmFailure(error: unknown) {
+  if (error instanceof GeminiError) {
+    console.error("[interview] gemini call failed:", error.message);
+    return NextResponse.json(
+      { error: "The AI interviewer is unavailable right now. Try again in a moment." },
+      { status: 502 }
+    );
+  }
+  throw error;
+}
+
+/** Generates the questions, or grades the answers to questions it generated. */
 export async function POST(request: Request) {
   let user;
   try {
@@ -44,17 +60,32 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
 
-  // Determine if this is a generate or grade request
-  const isGradeRequest = body && "answers" in body && "questions" in body;
+  const isGradeRequest = body && typeof body === "object" && "answers" in body && "questions" in body;
 
   if (isGradeRequest) {
-    // Grade the interview
     const parsed = gradeSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
     }
 
-    const { questions, answers, resourceId, skillId, summary } = parsed.data;
+    const { questions, answers, resourceId, skillId, summary, token } = parsed.data;
+
+    // Without this the questions are whatever the client felt like being asked:
+    // five "what is 2+2" prompts grade at 100% and mint signed evidence.
+    const issued = tokenMatches(token, {
+      k: "interview",
+      u: user.id,
+      r: resourceId,
+      s: skillId,
+      f: questionsFingerprint(questions)
+    });
+
+    if (!issued) {
+      return NextResponse.json(
+        { error: "That interview has expired or does not match. Start it again." },
+        { status: 400 }
+      );
+    }
 
     const [resource] = await findResourcesByIds([resourceId]);
     if (!resource) {
@@ -66,23 +97,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Unknown skill: ${skillId}` }, { status: 404 });
     }
 
-    // Grade with Gemini
-    const grading = await gradeInterviewAnswers(
-      questions as InterviewQuestion[],
-      answers,
-      skill
-    );
+    let grading;
+    try {
+      grading = await gradeInterviewAnswers(questions, answers, skill);
+    } catch (error) {
+      return llmFailure(error);
+    }
 
-    // Mint evidence if above threshold
     let evidenceId: string | null = null;
     if (grading.overall >= EVIDENCE_THRESHOLD && user.consentGiven) {
-      const timestamp = new Date().toISOString();
+      // Scores are re-shaped to the question count upstream, so index i is
+      // always question i.
       const validatedCapabilities = questions
-        .filter((q, i) => grading.scores[i] >= EVIDENCE_THRESHOLD)
-        .map((q, i) => {
-          const scoreIndex = questions.indexOf(q);
-          return `${skill.name} — ${Math.round(grading.scores[scoreIndex] * 100)}% on: ${q.question.slice(0, 60)}...`;
-        });
+        .map((question, index) => ({ question, score: grading.scores[index] }))
+        .filter((entry) => entry.score >= EVIDENCE_THRESHOLD)
+        .map(
+          (entry) =>
+            `${skill.name} — ${Math.round(entry.score * 100)}% on: ${entry.question.question.slice(0, 60)}...`
+        );
 
       if (validatedCapabilities.length > 0) {
         const evidence = await addEvidence({
@@ -94,7 +126,7 @@ export async function POST(request: Request) {
           artifactUrl: null,
           rubricScore: grading.overall,
           validatedCapabilities,
-          createdAt: timestamp
+          createdAt: new Date().toISOString()
         });
         evidenceId = evidence.id;
       }
@@ -107,7 +139,6 @@ export async function POST(request: Request) {
     });
   }
 
-  // Generate questions
   const parsed = generateSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -125,11 +156,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `Unknown skill: ${skillId}` }, { status: 404 });
   }
 
-  const questions = await generateInterviewQuestions(resource, skill);
+  if (!resource.skillTags.includes(skillId)) {
+    return NextResponse.json(
+      { error: "That resource does not teach that skill." },
+      { status: 400 }
+    );
+  }
+
+  let questions;
+  try {
+    questions = await generateInterviewQuestions(resource, skill);
+  } catch (error) {
+    return llmFailure(error);
+  }
 
   return NextResponse.json({
     resource: { id: resource.id, title: resource.title },
     skill: { id: skill.id, name: skill.name },
-    questions
+    questions,
+    token: issueToken(
+      {
+        k: "interview",
+        u: user.id,
+        r: resource.id,
+        s: skill.id,
+        f: questionsFingerprint(questions)
+      },
+      INTERVIEW_TOKEN_TTL_MS
+    )
   });
 }

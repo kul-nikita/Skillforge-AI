@@ -25,11 +25,9 @@ export default async function GraphPage() {
   const role = roles.find((r) => r.id === roleId);
   const requiredSkillIds = role?.requiredSkills.map((rs) => rs.skillId) ?? [];
 
-  // Get resources for all skills in the graph
   const allSkillIds = graph.skills.map((s) => s.id);
   const resources = await findResourcesByIds([]); // We'll filter by skill tags later
 
-  // Build graph data for Cytoscape
   const nodes = graph.skills.map((skill) => ({
     data: {
       id: skill.id,
@@ -42,7 +40,6 @@ export default async function GraphPage() {
     }
   }));
 
-  // Build edges from prerequisite relationships
   const edges = graph.skills.flatMap((skill) =>
     skill.prerequisites.map((prereqId) => ({
       data: { source: prereqId, target: skill.id }
