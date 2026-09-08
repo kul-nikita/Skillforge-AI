@@ -1,4 +1,4 @@
-import type { Gap, MasteryMap, Role, Skill, SkillGraph } from "@/lib/types";
+import type { Blocker, Gap, MasteryMap, Role, Skill, SkillGraph } from "@/lib/types";
 import { buildMilestones, type Milestone } from "@/lib/planner/milestones";
 
 export type RoadmapPlan = {
@@ -49,14 +49,30 @@ export function planRoadmap({
         totalImportance
       : 0;
 
+  const unlocksOf = (skillId: string) =>
+    requiredSkills
+      .filter((item) => item.skill.prerequisites.includes(skillId))
+      .map((item) => item.skill.name);
+
   const gapCandidates: Gap[] = requiredSkills
     .filter((item) => item.currentMastery < masteryThreshold)
-    .map((item) => ({ ...item, reason: buildGapReason(item.skill, skillById, mastery) }));
+    .map((item) => {
+      const blockedBy = unmetPrerequisites(item.skill, skillById, mastery);
+
+      return {
+        ...item,
+        blockedBy,
+        unlocks: unlocksOf(item.skill.id),
+        reason: gapSentence(item.skill, blockedBy)
+      };
+    });
 
   const mastered: Gap[] = requiredSkills
     .filter((item) => item.currentMastery >= masteryThreshold)
     .map((item) => ({
       ...item,
+      blockedBy: [],
+      unlocks: unlocksOf(item.skill.id),
       reason: `${item.skill.name} has enough evidence for this role right now.`
     }));
 
@@ -125,13 +141,25 @@ function transitivePrerequisites(skill: Skill, skillById: Map<string, Skill>): s
   return [...collected];
 }
 
-function buildGapReason(skill: Skill, skillById: Map<string, Skill>, mastery: MasteryMap) {
-  const missing = transitivePrerequisites(skill, skillById)
-    .filter((skillId) => clampMastery(mastery[skillId] ?? 0) < PREREQUISITE_THRESHOLD)
-    .map((skillId) => skillById.get(skillId)?.name ?? skillId);
+/** Every unmet prerequisite in the chain, each with the mastery that leaves it unmet. */
+function unmetPrerequisites(
+  skill: Skill,
+  skillById: Map<string, Skill>,
+  mastery: MasteryMap
+): Blocker[] {
+  return transitivePrerequisites(skill, skillById)
+    .map((skillId) => ({
+      skillId,
+      name: skillById.get(skillId)?.name ?? skillId,
+      mastery: clampMastery(mastery[skillId] ?? 0)
+    }))
+    .filter((blocker) => blocker.mastery < PREREQUISITE_THRESHOLD)
+    .sort((a, b) => b.mastery - a.mastery);
+}
 
-  return missing.length > 0
-    ? `Build prerequisite evidence first: ${missing.join(", ")}.`
+function gapSentence(skill: Skill, blockedBy: Blocker[]) {
+  return blockedBy.length > 0
+    ? `Build prerequisite evidence first: ${blockedBy.map((blocker) => blocker.name).join(", ")}.`
     : `${skill.name} is unlocked and below the target mastery threshold.`;
 }
 

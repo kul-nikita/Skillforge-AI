@@ -92,11 +92,27 @@ export type LearnerProfile = {
   updatedAt: string;
 };
 
+/** A prerequisite that is not met yet, and how far off it is. */
+export type Blocker = {
+  skillId: string;
+  name: string;
+  mastery: number;
+};
+
 export type Gap = {
   skill: Skill;
   importance: number;
   currentMastery: number;
+  /** The one-line summary. Kept because several surfaces want prose. */
   reason: string;
+  /**
+   * The same fact as `reason`, but structured: naming a blocker tells the
+   * learner nothing about how close they are to clearing it, and a UI cannot
+   * render a number out of a sentence.
+   */
+  blockedBy: Blocker[];
+  /** Skills in this role that open up once this one is evidenced. */
+  unlocks: string[];
 };
 
 export type Evidence = {

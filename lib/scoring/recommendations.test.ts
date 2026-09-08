@@ -38,7 +38,9 @@ const gap: Gap = {
   },
   importance: 1,
   currentMastery: 0.1,
-  reason: "Below target mastery."
+  reason: "Below target mastery.",
+  blockedBy: [],
+  unlocks: []
 };
 
 const preferences: LearnerPreferences = { maxHoursPerStep: 6, cost: "free", format: "lab" };

@@ -2,20 +2,39 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CalendarClock, CheckCircle2, Loader2, Route, ShieldCheck } from "lucide-react";
+import {
+  ArrowLeft,
+  CalendarClock,
+  CheckCircle2,
+  Loader2,
+  Route,
+  ShieldCheck,
+  Sparkles,
+  TrendingUp
+} from "lucide-react";
 import { CompleteResource } from "@/components/CompleteResource";
 import { ScoreBreakdown } from "@/components/ScoreBreakdown";
-import type { ScoreBreakdown as ScoreBreakdownType } from "@/lib/types";
+import { summariseDelta, type DiagnosticDelta } from "@/lib/diagnostic/delta";
+import type { Blocker, ScoreBreakdown as ScoreBreakdownType } from "@/lib/types";
+import { GapReason } from "@/components/GapReason";
+import { MentorPanel } from "@/components/MentorPanel";
 
 type Question = {
   id: string;
   skillId: string;
+  skillName: string;
   difficulty: string;
   prompt: string;
   options: string[];
+  /** Why this learner is being asked this. Null for a question from the bank. */
+  rationale: string | null;
+  written: "model" | "bank";
 };
 
-type Answer = { questionId: string; selectedIndex: number };
+/** The token is the server's sealed record of the question it issued; it comes
+ * back untouched so a stateless route can grade without ever having sent the
+ * answer key to the browser. */
+type Answer = { questionId: string; selectedIndex: number; token?: string };
 
 type Recommendation = {
   resource: { id: string; title: string; provider: string; url: string; costType: string };
@@ -27,7 +46,13 @@ type Roadmap = {
   roadmap: {
     role: { title: string };
     readiness: number;
-    gaps: Array<{ skill: { id: string; name: string }; currentMastery: number; reason: string }>;
+    gaps: Array<{
+      skill: { id: string; name: string };
+      currentMastery: number;
+      reason: string;
+      blockedBy: Blocker[];
+      unlocks: string[];
+    }>;
     mastered: Array<{ skill: { id: string; name: string } }>;
   };
   recommendations: Recommendation[];
@@ -63,14 +88,17 @@ export function DiagnosticFlow({
   // suggestion and threw the answer away; the diagnostic just starts.
   const roleId = targetRoleId;
   const [question, setQuestion] = useState<Question | null>(null);
+  const [token, setToken] = useState<string | undefined>(undefined);
+  const [askedPrompts, setAskedPrompts] = useState<string[]>([]);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [progress, setProgress] = useState({ answered: 0, max: 15 });
   const [result, setResult] = useState<Roadmap | null>(null);
   const [mastery, setMastery] = useState<Record<string, number>>({});
+  const [previousMastery, setPreviousMastery] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function advance(nextRoleId: string, nextAnswers: Answer[]) {
+  async function advance(nextRoleId: string, nextAnswers: Answer[], nextAsked: string[]) {
     setBusy(true);
     setError(null);
 
@@ -78,7 +106,12 @@ export function DiagnosticFlow({
       const res = await fetch("/api/diagnostic", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetRoleId: nextRoleId, answers: nextAnswers, persist: canPersist })
+        body: JSON.stringify({
+          targetRoleId: nextRoleId,
+          answers: nextAnswers,
+          askedPrompts: nextAsked,
+          persist: canPersist
+        })
       });
       if (!res.ok) throw new Error("Could not load the next question.");
       const data = await res.json();
@@ -86,6 +119,8 @@ export function DiagnosticFlow({
 
       if (!data.done) {
         setQuestion(data.question);
+        setToken(data.token);
+        setAskedPrompts([...nextAsked, data.question.prompt]);
         return;
       }
 
@@ -101,6 +136,7 @@ export function DiagnosticFlow({
 
       setQuestion(null);
       setMastery(data.mastery);
+      setPreviousMastery(data.previousMastery ?? {});
       setResult(await roadmapRes.json());
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Something went wrong.");
@@ -115,22 +151,24 @@ export function DiagnosticFlow({
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    void advance(roleId, []);
+    void advance(roleId, [], []);
   }, []);
 
   function answer(selectedIndex: number) {
     if (!question || !roleId) return;
-    const next = [...answers, { questionId: question.id, selectedIndex }];
+    const next = [...answers, { questionId: question.id, selectedIndex, token }];
     setAnswers(next);
-    void advance(roleId, next);
+    void advance(roleId, next, askedPrompts);
   }
 
   function restart() {
     setQuestion(null);
+    setToken(undefined);
+    setAskedPrompts([]);
     setAnswers([]);
     setResult(null);
     setError(null);
-    void advance(roleId, []);
+    void advance(roleId, [], []);
   }
 
   return (
@@ -180,6 +218,7 @@ export function DiagnosticFlow({
           <Results
             mastery={mastery}
             onRestart={restart}
+            previousMastery={previousMastery}
             result={result}
             roleId={roleId}
             weeklyHours={weeklyHours}
@@ -358,7 +397,7 @@ function QuestionCard({
           Question {progress.answered + 1} of at most {progress.max}
         </span>
         <span className="rounded-md bg-surface px-2 py-1 font-medium">
-          {question.skillId} · {question.difficulty}
+          {question.skillName} · {question.difficulty}
         </span>
       </div>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface">
@@ -369,6 +408,14 @@ function QuestionCard({
       </div>
 
       <article className="mt-5 rounded-lg border border-border bg-surface p-6">
+        {/* The question is written for this learner; saying so is the difference
+            between adaptive and merely appearing static. */}
+        {question.rationale && (
+          <p className="mb-4 flex items-start gap-2 rounded-md border border-cyan-300/20 bg-cyan-300/5 p-3 text-sm leading-6 text-cyan-100">
+            <Sparkles aria-hidden="true" className="mt-0.5 shrink-0" size={15} />
+            {question.rationale}
+          </p>
+        )}
         <h2 className="text-xl font-semibold text-ink">{question.prompt}</h2>
         <div className="mt-5 space-y-3">
           {question.options.map((option, index) => (
@@ -410,23 +457,97 @@ function QuestionCard({
   );
 }
 
+/** What changed since the last diagnostic. Rendered only on a repeat run. */
+function DeltaPanel({
+  delta,
+  skillName
+}: {
+  delta: DiagnosticDelta;
+  skillName: (skillId: string) => string;
+}) {
+  const moved = delta.improved.length + delta.declined.length + delta.newlyAssessed.length;
+
+  return (
+    <article className="rounded-lg border border-border bg-surface p-6">
+      <div className="flex items-center gap-2">
+        <TrendingUp aria-hidden="true" className="text-teal" size={20} />
+        <h2 className="text-lg font-semibold">Since your last diagnostic</h2>
+      </div>
+
+      {moved === 0 ? (
+        // Saying so is the point: a rerun that changed nothing is a result, and
+        // hiding it is what made the second run feel pointless.
+        <p className="mt-3 text-sm leading-6 text-muted">
+          Nothing moved — the same {delta.unchangedCount} skill
+          {delta.unchangedCount === 1 ? "" : "s"} landed on the same estimate. Finishing a resource
+          and passing its check is what shifts these.
+        </p>
+      ) : (
+        <ul className="mt-4 space-y-2">
+          {[
+            ...delta.improved.map((m) => ({ m, tone: "text-emerald-200", sign: "+" })),
+            ...delta.declined.map((m) => ({ m, tone: "text-amber-200", sign: "" }))
+          ].map(({ m, tone, sign }) => (
+            <li
+              className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm"
+              key={m.skillId}
+            >
+              <span className="font-medium text-ink">{skillName(m.skillId)}</span>
+              <span className={`shrink-0 tabular-nums ${tone}`}>
+                {Math.round((m.before ?? 0) * 100)}% → {Math.round(m.after * 100)}% ({sign}
+                {Math.round(m.change * 100)})
+              </span>
+            </li>
+          ))}
+          {delta.newlyAssessed.map((m) => (
+            <li
+              className="flex items-center justify-between gap-3 rounded-md border border-dashed border-border p-3 text-sm"
+              key={m.skillId}
+            >
+              <span className="font-medium text-ink">{skillName(m.skillId)}</span>
+              <span className="shrink-0 tabular-nums text-muted">
+                first measured · {Math.round(m.after * 100)}%
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {moved > 0 && delta.unchangedCount > 0 && (
+        <p className="mt-3 text-xs text-muted">
+          {delta.unchangedCount} other skill{delta.unchangedCount === 1 ? "" : "s"} landed on the same
+          estimate.
+        </p>
+      )}
+    </article>
+  );
+}
+
 function Results({
   mastery,
   onRestart,
+  previousMastery,
   result,
   roleId,
   weeklyHours
 }: {
   mastery: Record<string, number>;
   onRestart: () => void;
+  previousMastery: Record<string, number>;
   result: Roadmap;
   roleId: string;
   weeklyHours: number;
 }) {
   const { roadmap, recommendations } = result;
+  const delta = summariseDelta(previousMastery, mastery);
+  const skillName = (skillId: string) =>
+    [...roadmap.gaps.map((gap) => gap.skill), ...roadmap.mastered.map((item) => item.skill)].find(
+      (skill) => skill.id === skillId
+    )?.name ?? skillId;
 
   return (
     <section className="space-y-6">
+      {!delta.firstRun && <DeltaPanel delta={delta} skillName={skillName} />}
       <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-ink">{roadmap.role.title} readiness</h2>
@@ -454,7 +575,13 @@ function Results({
               </span>
               <div>
                 <h3 className="font-semibold">{gap.skill.name}</h3>
-                <p className="mt-1 text-sm text-muted">{gap.reason}</p>
+                <GapReason
+                  blockedBy={gap.blockedBy}
+                  currentMastery={gap.currentMastery}
+                  reason={gap.reason}
+                  skillName={gap.skill.name}
+                  unlocks={gap.unlocks}
+                />
               </div>
               <span className="ml-auto shrink-0 self-start rounded-md bg-canvas px-2 py-1 text-sm font-medium">
                 {Math.round(gap.currentMastery * 100)}%
@@ -503,6 +630,10 @@ function Results({
       </article>
 
       <WeekPlanner mastery={mastery} roleId={roleId} weeklyHours={weeklyHours} />
+
+      {/* The screen where a learner is most likely to have a question is the one
+          that just told them what they do not know. */}
+      <MentorPanel />
 
       <button
         className="inline-flex h-10 items-center rounded-md border border-border bg-surface px-4 text-sm font-semibold hover:border-teal"

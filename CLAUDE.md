@@ -344,6 +344,56 @@ Still not true / not built:
 Update this section as the build progresses so a fresh Claude Code session
 knows where things stand without re-deriving it.
 
+- 2026-09-09: **Flow coherence, then real adaptivity** (spec:
+  `docs/superpowers/specs/2026-09-09-flow-coherence-design.md`).
+  **Phase 1 — the app stopped asking twice and stopped discarding the answers.**
+  `DiagnosticFlow` initialised `roleId` to null and rendered a role picker even
+  though the page passed `defaultRoleId`, so onboarding's choice was demoted to a
+  highlighted suggestion; and `WEEKLY_HOURS = 8` / `PREFERENCES = {free, lab}`
+  were module constants, so a learner who said "2 hours a week, paid is fine" got
+  a week planned for 8 hours of free labs. Both `/api/roadmap` and `/api/replan`
+  already fall back to the stored profile, so the fix was to **stop sending
+  fabricated values** rather than plumb new ones through. Consent became a
+  condition of the account (statement at signup, `consentGiven: true` on save,
+  export/delete unchanged) — a departure from product rule 5, recorded in the
+  spec rather than made silently. Timeline and weekly hours now take phrases
+  (`lib/planner/duration-phrases.ts`, deterministic on purpose) and echo the
+  number they were read as.
+  **Phase 2 — the diagnostic is written per learner.**
+  `lib/llm/diagnostic-questions.ts` generates each question from the target role,
+  the learner's stated level, their tools and what they have already been asked;
+  the 288-question bank is the fallback and the diagnostic still runs with no API
+  key. **Sequencing did not move into the model**: `remainingTargets()` picks the
+  skill and the level from role importances, and only the wording is generated
+  (product rule 2).
+  The engine change that made this possible: a `DiagnosticAnswer` now carries its
+  own `skillId` and `difficulty`. Every step used to look the question up in the
+  bank by id, which made a generated question ungradeable and unscoreable.
+  Grading a generated question uses the issued-question HMAC — the route seals
+  `{learner, questionId, skillId, difficulty, correctIndex}` into a token, the
+  client echoes it back, and four tests pin the refusals: another learner's
+  token, a token naming a different question, a forged token, and an id backed by
+  neither bank nor token (dropped, not scored wrong — otherwise a caller could
+  pad a run with fake ids to drag an estimate down).
+  Also: `Gap` gained `blockedBy` (each unmet prerequisite with its mastery) and
+  `unlocks`, so `components/GapReason` can say "Networking Fundamentals, 10% —
+  needs 60%; clearing this opens Alert Triage" instead of naming a blocker and
+  stopping. `/api/explain` feeds those same blockers to the model, which changed
+  the output from a restatement of the catalog row into the learner's own
+  position — and caught a real misreading in the process: the model wrote "short
+  on Log Analysis by 40 percent" when 40% was their *current* level, so the
+  instruction now says explicitly that masteryPercent is a level, never a
+  shortfall. A repeat diagnostic renders a delta (`lib/diagnostic/delta.ts`);
+  "nothing moved" is shown as the result it is. The mentor now also sits on the
+  diagnostic results, the screen most likely to raise a question.
+  Verified against the live model, not assumed: generated SOC questions were
+  scenario-based with plausible distractors, the rationale changed with the
+  profile it was given, and the token round-trip graded correct/incorrect
+  correctly. 225 unit tests, `tsc` and lint clean, build green.
+  **Note for deployment: `EVIDENCE_SIGNING_SECRET` now also signs diagnostic
+  question tokens.** Unset, it falls back to a well-known dev key, which would
+  make those tokens forgeable — it needs to be set in production.
+
 - 2026-09-09: **Onboarding review screen now shows consequences.**
   The flow asked for a role, a deadline and a weekly budget and then said nothing
   about what those numbers commit the learner to. `lib/planner/onboarding-fit.ts`

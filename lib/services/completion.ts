@@ -58,7 +58,9 @@ export function gradeCompletion(
   submitted: SubmittedAnswer[]
 ): { bySkill: SkillResult[]; overall: number } {
   const graded = new Map(
-    gradeAnswers(submitted).map((answer) => [answer.questionId, answer.correct])
+    // null: the post-check is drawn from the bank, so there is no issued token
+    // to honour and an answer must be graded against the bank or not at all.
+    gradeAnswers(submitted, null).map((answer) => [answer.questionId, answer.correct])
   );
   const skillOf = new Map(questionBank.map((question) => [question.id, question.skillId]));
 

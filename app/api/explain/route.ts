@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/session";
-import { getMastery } from "@/lib/db/learners";
+import { getMastery, getProfile } from "@/lib/db/learners";
 import { findResourcesByIds } from "@/lib/db/resources";
 import { getSkillGraph } from "@/lib/graph/queries";
+import { buildRoadmap } from "@/lib/services/recommendations";
 import { scoreResourcesForGap } from "@/lib/scoring/recommendations";
 import { generateGroundedExplanation, type GroundedFacts } from "@/lib/llm/grounded-explanations";
 
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
   // Facts are recomputed from the stores — never taken from the request body,
   // so a caller cannot feed fabricated numbers into the prompt.
   const [scored] = scoreResourcesForGap({
-    gap: { skill, importance: 1, currentMastery, reason: "" },
+    gap: { skill, importance: 1, currentMastery, reason: "", blockedBy: [], unlocks: [] },
     resources: [resource],
     mastery,
     preferences: { maxHoursPerStep: 4, cost: "any", format: "any" },
@@ -60,6 +61,15 @@ export async function POST(request: Request) {
   if (!scored) {
     return NextResponse.json({ error: "That resource is not a valid candidate." }, { status: 400 });
   }
+
+  // The same blockers the roadmap shows, from the same planner — an explanation
+  // that disagreed with the list next to it would be worse than none.
+  const profile = await getProfile(user.id);
+  const gap = profile?.targetRoleId
+    ? (await buildRoadmap(profile.targetRoleId, mastery)).gaps.find(
+        (candidate) => candidate.skill.id === skillId
+      )
+    : undefined;
 
   const facts: GroundedFacts = {
     resource: {
@@ -72,7 +82,16 @@ export async function POST(request: Request) {
     },
     skillName: skill.name,
     currentMasteryPercent: Math.round(currentMastery * 100),
-    score: scored.score
+    score: scored.score,
+    ...(gap && gap.blockedBy.length > 0
+      ? {
+          blockedBy: gap.blockedBy.map((blocker) => ({
+            name: blocker.name,
+            masteryPercent: Math.round(blocker.mastery * 100)
+          }))
+        }
+      : {}),
+    ...(gap && gap.unlocks.length > 0 ? { unlocks: gap.unlocks } : {})
   };
 
   const result = await generateGroundedExplanation(facts, scored.explanation.whatGapItCloses);

@@ -13,6 +13,7 @@ import { ScoreBreakdown } from "@/components/ScoreBreakdown";
 import { ExplainButton } from "@/components/ExplainButton";
 import { ResourceSearch } from "@/components/ResourceSearch";
 import { SkillHeatmap } from "@/components/SkillHeatmap";
+import { GapReason } from "@/components/GapReason";
 import { ReadinessTimeline } from "@/components/ReadinessTimeline";
 import { buildRoadmap, candidatesForGap } from "@/lib/services/recommendations";
 import { getMastery, getProfile, listEvidence, listEvents } from "@/lib/db/learners";
@@ -306,7 +307,13 @@ export default async function DashboardPage() {
                           style={{ width: `${Math.max(Math.round(gap.currentMastery * 100), 3)}%` }}
                         />
                       </div>
-                      <p className="mt-2 text-xs leading-5 text-muted">{gap.reason}</p>
+                      <GapReason
+                        blockedBy={gap.blockedBy}
+                        currentMastery={gap.currentMastery}
+                        reason={gap.reason}
+                        skillName={gap.skill.name}
+                        unlocks={gap.unlocks}
+                      />
                     </div>
                   </li>
                 );

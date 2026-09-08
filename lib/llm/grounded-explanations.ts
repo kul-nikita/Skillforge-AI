@@ -9,6 +9,15 @@ export type GroundedFacts = {
   skillName: string;
   currentMasteryPercent: number;
   score: ScoreBreakdown;
+  /**
+   * The learner's own evidence for why this skill sits where it does: which
+   * prerequisites are still short, and by how much. Without these the model can
+   * only restate the resource, which is why the old explanations read the same
+   * for every learner.
+   */
+  blockedBy?: Array<{ name: string; masteryPercent: number }>;
+  /** Skills in the target role that this one opens up. */
+  unlocks?: string[];
 };
 
 
@@ -22,8 +31,13 @@ function buildGroundedPrompt(facts: GroundedFacts) {
     system:
       "You write one short paragraph (max 45 words) explaining why a learning resource was recommended. " +
       "Use ONLY the facts in the JSON. Never state a URL, web address, price, rating, certificate, " +
-      "accreditation, or job guarantee. The only numbers you may write are the duration and the " +
-      "current mastery percentage; never cite the score components. " +
+      "accreditation, or job guarantee. The only numbers you may write are the duration, the " +
+      "current mastery percentage, and any masteryPercent under blockedBy; never cite the score " +
+      "components. " +
+      "When blockedBy is present, name those prerequisites and say the learner is AT that " +
+      "masteryPercent in each — it is their current level, never a shortfall or a gap size, so " +
+      "never write \"short by\" or \"needs another\" in front of it. When unlocks is present, " +
+      "name what finishing this opens up. " +
       "Do not promise outcomes. Plain prose, no markdown, no lists.",
     user: JSON.stringify(facts, null, 2)
   };
@@ -42,7 +56,11 @@ export function allowedNumbers(facts: GroundedFacts): Set<string> {
     facts.resource.durationMinutes,
     facts.currentMasteryPercent,
     Math.round(hours),
-    Number.isInteger(hours) ? hours : Number(hours.toFixed(1))
+    Number.isInteger(hours) ? hours : Number(hours.toFixed(1)),
+    // Widening the set is a real cost (see above), but a blocker's percentage is
+    // exactly the number that makes the explanation about this learner, and it
+    // comes from the same mastery map the rest of the pack does.
+    ...(facts.blockedBy ?? []).map((blocker) => blocker.masteryPercent)
   ];
 
   return new Set(values.map((value) => String(value)));

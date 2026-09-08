@@ -18,6 +18,8 @@ const gap = (id: string, prerequisites: string[] = [], mastery = 0): Gap => ({
   skill: skill(id, prerequisites),
   importance: 1,
   currentMastery: mastery,
+  blockedBy: [],
+  unlocks: [],
   reason: ""
 });
 
