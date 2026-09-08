@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth/session";
 import { listRoles } from "@/lib/graph/queries";
 import { extractLearnerIntent, followUpFor, needsFollowUp } from "@/lib/llm/intent-extraction";
-import { GeminiError } from "@/lib/llm/gemini";
+import { LlmError } from "@/lib/llm/client";
 import { upsertProfile } from "@/lib/db/learners";
 import { setConsent } from "@/lib/db/users";
 import { preferencesSchema } from "@/lib/db/schemas";
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error: "The assistant is unavailable right now — you can set your goal manually instead.",
-        modelUnavailable: error instanceof GeminiError
+        modelUnavailable: error instanceof LlmError
       },
       { status: 502 }
     );

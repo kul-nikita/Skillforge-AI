@@ -1,4 +1,4 @@
-import { geminiApiKey, geminiText } from "@/lib/llm/gemini";
+import { llmApiKey, llmText } from "@/lib/llm/client";
 import { findViolations, type GroundingViolation } from "@/lib/llm/grounded-explanations";
 import type { JourneyStage } from "@/lib/services/journey";
 
@@ -90,12 +90,12 @@ export async function generateCoachNote(
 ): Promise<{ text: string; source: "llm" | "fallback"; violations: GroundingViolation[] }> {
   const fallback = deterministicCoachNote(facts);
 
-  if (!geminiApiKey()) {
+  if (!llmApiKey()) {
     return { text: fallback, source: "fallback", violations: [] };
   }
 
   try {
-    const text = await geminiText({
+    const text = await llmText({
       system: SYSTEM,
       user: JSON.stringify(facts, null, 2),
       temperature: 0.3,

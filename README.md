@@ -26,7 +26,7 @@ against the live database (vitest cannot reach Cypher).
 
 ### 2. The LLM explains; it never supplies a fact
 
-Gemini parses goals and writes prose. It cannot originate a URL, price,
+The chat model parses goals and writes prose. It cannot originate a URL, price,
 duration, rating or certificate name — those come only from the catalog.
 
 This is not left to prompt instructions. `/api/explain` recomputes the facts
@@ -57,7 +57,7 @@ graph and the catalog supply the facts, the LLM only phrases them.
 
 ### Job-description gap analyzer (`/gap-analyzer`)
 
-Paste a real posting. Gemini extracts the skills it names — required vs.
+Paste a real posting. The model extracts the skills it names — required vs.
 nice-to-have, with a confidence score and the exact phrase each came from — and
 the backend maps them onto the target role's skill graph. The model can name a
 skill; only the graph decides whether it exists and how it sequences. Output is
@@ -135,7 +135,7 @@ them is the same boundary as the product rule: **the graph and the LLM never
 share write authority.**
 
 ```
- goal text ──▶ Gemini ──▶ structured intent   (role enum built from the graph,
+ goal text ──▶ model ──▶ structured intent   (role enum built from the graph,
                                                so it cannot invent a role)
                             │
  diagnostic ──▶ events ──▶ mastery            (append-only; mastery is derived)
@@ -157,7 +157,7 @@ not feel like missing results.
 
 **Stack:** Next.js 15 (App Router, TypeScript) · Tailwind · Cytoscape (skill
 graph) · Recharts (readiness timeline) · Neo4j AuraDB · MongoDB Atlas · Qdrant
-Cloud · Gemini (`gemini-2.5-flash`, `gemini-embedding-001` @ 768 dims, plain
+Cloud · Cerebras (`gemma-4-31b`) for chat, Gemini (`gemini-embedding-001` @ 768 dims, plain
 `fetch`, no SDK) · Vercel.
 
 The signed-in app renders on a single dark theme driven by semantic Tailwind
@@ -225,7 +225,8 @@ npm run dev
 
 | Variable | Purpose |
 |---|---|
-| `GEMINI_API_KEY` | Intent extraction and embeddings. Optional — explanations fall back to deterministic text without it. |
+| `CEREBRAS_API_KEY` | Every chat-model call: intent extraction, explanations, JD parsing, mentor/coach, interview. Optional — explanations fall back to deterministic text without it. |
+| `GEMINI_API_KEY` | Embeddings only (Cerebras serves no embedding model). Without it `/api/search` cannot embed a query. |
 | `MONGODB_URI` | Full `mongodb+srv://` string. |
 | `NEO4J_URI` / `NEO4J_USER` / `NEO4J_PASSWORD` | AuraDB. |
 | `QDRANT_URL` / `QDRANT_API_KEY` | Qdrant Cloud. |
@@ -347,8 +348,8 @@ Kept here deliberately rather than left for someone to discover.
   guesses.
 - **Nothing rate-limits the LLM routes per learner** beyond input size caps, so a
   signed-in learner can spend API budget in a loop.
-- **The JD gap analyzer and verification interview need `GEMINI_API_KEY`** and
-  have no deterministic fallback (unlike explanations). A Gemini outage is
+- **The JD gap analyzer and verification interview need `CEREBRAS_API_KEY`** and
+  have no deterministic fallback (unlike explanations). A model outage is
   retried and then surfaces as a 502 — those two features
   are simply unavailable while the key is missing or the model is down.
 - **`/verify/<id>` proves integrity, not provenance.** A valid signature means

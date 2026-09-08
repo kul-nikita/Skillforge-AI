@@ -99,7 +99,8 @@ IDs stay consistent across all three.
 | Graph store | **Neo4j** (AuraDB free tier for the demo) | Roles, skills, prerequisites, and resource→skill edges live here as real graph relationships — prerequisite validation is a Cypher traversal, not app-level recursion |
 | Document store | **MongoDB** (Atlas free tier) | Learner profiles, mastery scores, event log, evidence wallet, and full resource metadata — flexible schema, easy to iterate on during a hackathon |
 | Vector store | **Qdrant** (Qdrant Cloud free tier or local Docker) | Embeddings of resource descriptions + learner intent for semantic retrieval/discovery, layered on top of the deterministic graph filter — never a substitute for it |
-| LLM | Gemini API, structured JSON output only | Goal parsing, explanations, conversation — never sequencing logic |
+| LLM | Cerebras (`gemma-4-31b`), structured JSON output only | Goal parsing, explanations, conversation — never sequencing logic |
+| Embeddings | Gemini (`gemini-embedding-001`) | Cerebras serves no embedding model, so semantic search stays here |
 | Auth | Clerk or simple email magic-link (MongoDB Atlas App Services / NextAuth) | Minutes to wire up, not hours |
 | Hosting | Vercel (app) + Neo4j AuraDB + MongoDB Atlas + Qdrant Cloud (all free tiers) | Zero-config deploy for the demo |
 
@@ -156,7 +157,7 @@ lib/
   db/                    MongoDB client, collections, Zod schemas
   diagnostic/            Adaptive question ladder + the question bank
   graph/                 Neo4j driver and Cypher (read-mostly at runtime)
-  llm/                   Gemini client and prompts; structured output only
+  llm/                   Cerebras client and prompts; structured output only
   planner/               Prerequisite validation and sequencing (NO LLM)
   prediction/            Readiness timeline (NO LLM)
   scoring/               Recommendation scoring formula (NO LLM)
@@ -229,7 +230,7 @@ when nothing read them at runtime. Current truth, verified:
 
 - **Grounded explanations are enforced, not just prompted.** `/api/explain`
   recomputes the facts from Mongo + Neo4j (never from the request body, so a
-  caller cannot feed fabricated numbers into the prompt), asks Gemini for
+  caller cannot feed fabricated numbers into the prompt), asks the model for
   prose, then runs `findGroundingViolations` over the reply. Output naming a
   URL/bare domain, a price or currency symbol, a certificate or accreditation
   or job guarantee, or *any number outside a narrow allowed set* is discarded
@@ -270,7 +271,7 @@ when nothing read them at runtime. Current truth, verified:
   allowlist need explicit confirmation.
 
 - **The roadmap now has portfolio and readiness surfaces, and they keep the
-  same boundary.** `/gap-analyzer` (`POST /api/jd/parse`) asks Gemini to extract
+  same boundary.** `/gap-analyzer` (`POST /api/jd/parse`) asks the model to extract
   skills from a pasted job description — names, required/nice-to-have,
   confidence, and the source phrase — then `matchJDSkillsToGraph` maps them onto
   the target role's Neo4j skills. The model proposes skill names; the graph is
@@ -308,7 +309,7 @@ when nothing read them at runtime. Current truth, verified:
   five questions the *learner* wrote. Interview answers are also fenced and
   declared untrusted data in the grading prompt.
 
-- **Every Gemini call goes through `lib/llm/gemini.ts`**, which times out and
+- **Every chat-model call goes through `lib/llm/client.ts`**, which times out and
   retries 429/5xx with backoff. A transient 503 is now a retry and then a clean
   502, not a 500 with an upstream stack in the body. No route echoes an upstream
   error message to the browser — those go to the server log.
@@ -334,7 +335,7 @@ Still not true / not built:
   signed-in learner can still spend API budget in a loop.
 - The 152-test suite covers the planner, scoring, grounding, adaptation,
   diagnostic engine, completion, catalog integrity, evidence signing, issued-
-  question tokens, the Gemini retry policy, JD matching, timeline prediction and
+  question tokens, the model retry policy, JD matching, timeline prediction and
   SSRF filtering. Route handlers themselves are covered by the scripted E2E run,
   not by vitest.
 
@@ -342,6 +343,57 @@ Still not true / not built:
 
 Update this section as the build progresses so a fresh Claude Code session
 knows where things stand without re-deriving it.
+
+- 2026-09-09: **Onboarding review screen now shows consequences.**
+  The flow asked for a role, a deadline and a weekly budget and then said nothing
+  about what those numbers commit the learner to. `lib/planner/onboarding-fit.ts`
+  (`describeFit`) turns them into "10 skills, 84 hours, about 8.4 per skill" with
+  a comfortable/workable/tight verdict. It is arithmetic, not a model call, and
+  deliberately does **not** sum catalog durations: that needs a per-skill query,
+  and honest division beats a total-hours figure that looks precise and isn't.
+  It costs no round-trip either — `listRoles()` already returns `requiredSkills`,
+  so the panel recomputes on every keystroke from data the client already had.
+  Product rule 6 is a test, not a hope: the tight note names the two knobs that
+  widen the plan and `onboarding-fit.test.ts` asserts it never says can't.
+  **The consent checkbox's cost is now stated where the choice is made.** It is
+  off by default, and `app/api/diagnostic/route.ts` gates event persistence on
+  it, so the old screen let a learner answer ~15 diagnostic questions that were
+  silently discarded — readiness stuck at 0% with nothing saying why. The
+  confirm button now reads "Continue without saving results" when it is off.
+  Smaller fixes in the same pass: the page hardcoded "Step 1 of 4" and never
+  advanced, so the stepper moved into the component and is named rather than
+  numbered (the follow-up step only exists when the model guessed something
+  critical, and 1 -> 3 reads as a bug); the 19-role `<select>` is grouped by
+  domain instead of flat `Title (domain-id)` options; a follow-up question was a
+  dead end short of a reload, so "Rewrite my goal" is reachable from it;
+  `maxHoursPerStep` is editable, since the model extracts it and it feeds
+  `TimeFit` but nothing ever showed it; and the component now uses the shared
+  `lib/ui` class strings it had been duplicating inline.
+  Verified in a browser against a throwaway harness that stubbed `fetch` so the
+  real component walked its real path (deleted after): follow-up branch, review
+  screen, and the panel flipping green -> cyan live when 4h/week became 2h.
+  208/208 unit tests, `tsc` and lint clean, production build green.
+
+- 2026-09-08: **Chat model swapped from Gemini to Cerebras `gemma-4-31b`.**
+  `lib/llm/gemini.ts` became `lib/llm/client.ts` (`llmText`/`llmJson`/`LlmError`)
+  and now posts to Cerebras's OpenAI-compatible `/v1/chat/completions`. The
+  rename was the point: leaving a file called `gemini.ts` calling Cerebras is the
+  kind of lie this file exists to prevent. Timeout, backoff and the 429/5xx retry
+  policy are unchanged, so the transient-503 handling still holds.
+  **Embeddings deliberately stayed on Gemini** — Cerebras serves no embedding
+  model — so `lib/vector/embeddings.ts` keeps `GEMINI_API_KEY` and only borrows
+  `postJsonWithRetry`. Two keys now, and `.env.example` says which does what.
+  The one piece of real new logic is `toStrictJsonSchema()`: nine call sites
+  describe their shapes in Gemini's dialect (`type: "OBJECT"`, `nullable: true`),
+  while OpenAI `strict` mode wants lowercase types, nullability in the type
+  itself, and — the part that fails loudly if missed — *every* property listed in
+  `required` plus `additionalProperties: false`. Converting in one function beat
+  rewriting nine schema literals; `client.test.ts` pins the conversion.
+  Verified against the live API rather than assumed: intent extraction returned
+  `cloud-security-associate` from free text (role enum still built from Neo4j),
+  JD parsing pulled 5 skills from a real posting, the interview generated its 5
+  scenario questions, and the unstructured mentor path returned grounded prose.
+  203/203 unit tests, `tsc` and lint clean.
 
 - 2026-08-24: Root-level Next.js/TypeScript scaffold started. Deterministic
   planner, scoring, adaptation, grounded LLM prompt boundary, dry-run seed

@@ -230,7 +230,7 @@ the session profile, never the request body.
 
 ### Job-description parsing (`lib/llm/jd-parsing.ts`, `/api/jd/parse`)
 
-Gemini extracts skills from pasted JD text under a strict `responseSchema`:
+The chat model extracts skills from pasted JD text under a strict response schema:
 `{ name, required, confidence, originalText }` per skill plus `jobTitle` and
 `company`. This is the **one place the model originates a term** — a skill
 name it read in the posting. It is contained immediately: `matchJDSkillsToGraph`
@@ -258,7 +258,7 @@ event log grows.
 
 ### Verification interview (`lib/llm/interview.ts`, `/api/interview`)
 
-An alternative post-check. Gemini generates five scenario questions for the
+An alternative post-check. The chat model generates five scenario questions for the
 skill and, on submission, grades each answer 0–1 on accuracy and depth
 (structured output). Grading is server-side; the questions carry no answer
 key to the client. A mean ≥ 0.5 mints a `verification-interview` evidence
@@ -271,7 +271,7 @@ answers are free prose, but still not self-reported.
 at mint time and stores it as `signature`. `serializeEvidence` fixes field
 order so the hash is stable. The public `/verify/<id>?sig=…` page recomputes
 it and reports intact / altered. A missing secret falls back to a well-known
-dev key (like `GEMINI_API_KEY`, not like `MONGODB_URI`) so completion never
+dev key (like `CEREBRAS_API_KEY`, not like `MONGODB_URI`) so completion never
 breaks locally — set a real value wherever a shared link must be unforgeable.
 
 ## Resource sourcing

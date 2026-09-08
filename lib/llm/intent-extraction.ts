@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Role } from "@/lib/types";
-import { geminiJson } from "@/lib/llm/gemini";
+import { llmJson } from "@/lib/llm/client";
 
 const preferencesShape = z.object({
   maxHoursPerStep: z.number().min(0.5).max(20),
@@ -86,7 +86,7 @@ export function followUpFor(assumed: string[], question: string | null): string 
 
 export type LearnerIntent = z.infer<ReturnType<typeof buildIntentSchema>>;
 
-/** Gemini's own structured-output schema — the first of the two gates. */
+/** The provider's structured-output schema — the first of the two gates. */
 function responseSchema(roleIds: string[]) {
   const stringArray = { type: "ARRAY", items: { type: "STRING" } };
 
@@ -200,7 +200,7 @@ Return ONLY the structured JSON response matching the provided schema.
 
   // The model proposes; the graph disposes. `buildIntentSchema` re-checks the
   // role id against the seeded list even though the enum already constrained it.
-  return geminiJson(
+  return llmJson(
     {
       system: systemInstruction,
       user: transcript,

@@ -1,4 +1,4 @@
-import { geminiApiKey, geminiText } from "@/lib/llm/gemini";
+import { llmApiKey, llmText } from "@/lib/llm/client";
 import { findViolations, type GroundingViolation } from "@/lib/llm/grounded-explanations";
 
 /**
@@ -101,12 +101,12 @@ export async function answerMentorQuestion(
   question: string,
   facts: MentorFacts
 ): Promise<{ text: string; source: "llm" | "fallback"; violations: GroundingViolation[] }> {
-  if (!geminiApiKey()) {
+  if (!llmApiKey()) {
     return { text: UNAVAILABLE, source: "fallback", violations: [] };
   }
 
   try {
-    const text = await geminiText({
+    const text = await llmText({
       system: SYSTEM,
       user: [
         "LEARNER STATE:",

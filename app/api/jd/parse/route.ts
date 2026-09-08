@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/auth/session";
 import { parseJobDescription, matchJDSkillsToGraph } from "@/lib/llm/jd-parsing";
 import { getSkillGraph, getRole } from "@/lib/graph/queries";
 import { getMastery, getProfile } from "@/lib/db/learners";
-import { GeminiError } from "@/lib/llm/gemini";
+import { LlmError } from "@/lib/llm/client";
 
 export const dynamic = "force-dynamic";
 
@@ -30,12 +30,12 @@ export async function POST(request: Request) {
   const { jdText } = parsed.data;
   const roleId = (await getProfile(user.id))?.targetRoleId;
 
-  // Parse the JD with Gemini
+  // Parse the JD with the chat model
   let jdResult;
   try {
     jdResult = await parseJobDescription(jdText);
   } catch (error) {
-    if (error instanceof GeminiError) {
+    if (error instanceof LlmError) {
       console.error("[jd/parse] gemini call failed:", error.message);
       return NextResponse.json(
         { error: "Could not read that job description right now. Try again in a moment." },

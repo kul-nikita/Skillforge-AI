@@ -1,4 +1,4 @@
-import { GeminiError, postJsonWithRetry } from "@/lib/llm/gemini";
+import { LlmError, postJsonWithRetry } from "@/lib/llm/client";
 
 const EMBEDDING_MODEL = "gemini-embedding-001";
 export const EMBEDDING_DIMENSIONS = 768;
@@ -6,7 +6,7 @@ export const EMBEDDING_DIMENSIONS = 768;
 export async function embedText(text: string, taskType: "RETRIEVAL_DOCUMENT" | "RETRIEVAL_QUERY") {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new GeminiError("GEMINI_API_KEY is required for embeddings.", null, false);
+    throw new LlmError("GEMINI_API_KEY is required for embeddings.", null, false);
   }
 
   // Shares the retry policy with the generate calls: the free tier rate-limits
@@ -24,7 +24,7 @@ export async function embedText(text: string, taskType: "RETRIEVAL_DOCUMENT" | "
   const payload = await response.json().catch(() => null);
   const values = payload?.embedding?.values;
   if (!Array.isArray(values)) {
-    throw new GeminiError("Gemini embedding response missing values.", null, true);
+    throw new LlmError("Gemini embedding response missing values.", null, true);
   }
 
   return values as number[];

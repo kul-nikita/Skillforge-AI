@@ -11,7 +11,7 @@ import { findResourcesByIds } from "@/lib/db/resources";
 import { getSkillsByIds } from "@/lib/graph/queries";
 import { addEvidence } from "@/lib/db/learners";
 import { fingerprint, issueToken, tokenMatches } from "@/lib/crypto/signing";
-import { GeminiError } from "@/lib/llm/gemini";
+import { LlmError } from "@/lib/llm/client";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +39,7 @@ function questionsFingerprint(questions: Array<{ id: string; question: string }>
 }
 
 function llmFailure(error: unknown) {
-  if (error instanceof GeminiError) {
+  if (error instanceof LlmError) {
     console.error("[interview] gemini call failed:", error.message);
     return NextResponse.json(
       { error: "The AI interviewer is unavailable right now. Try again in a moment." },

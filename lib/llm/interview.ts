@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { LearningResource, Skill } from "@/lib/types";
-import { geminiJson } from "@/lib/llm/gemini";
+import { llmJson } from "@/lib/llm/client";
 
 /** Free prose from the learner: capped so one request cannot run up a bill. */
 const MAX_ANSWER_CHARS = 4000;
@@ -90,7 +90,7 @@ RULES:
 Return ONLY the structured JSON response matching the provided schema.
 `;
 
-  const { questions } = await geminiJson(
+  const { questions } = await llmJson(
     {
       system,
       user: `Generate the ${INTERVIEW_QUESTION_COUNT} interview questions for this skill verification.`,
@@ -103,7 +103,7 @@ Return ONLY the structured JSON response matching the provided schema.
 }
 
 /**
- * Grade interview answers using Gemini.
+ * Grade interview answers with the chat model.
  *
  * The answers are learner-controlled text going into a prompt whose verdict
  * mints evidence, so they are fenced and the grader is told they are data. The
@@ -148,7 +148,7 @@ question and say so in the feedback.
 Return ONLY the structured JSON response matching the provided schema.
 `;
 
-  const grading = await geminiJson(
+  const grading = await llmJson(
     { system, user: `Interview answers to grade:\n\n${qaPairs}`, responseSchema: gradingResponseSchema },
     interviewGradingSchema
   );

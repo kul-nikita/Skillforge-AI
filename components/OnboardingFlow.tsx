@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Role } from "@/lib/types";
+import type { Domain, Role } from "@/lib/types";
 import { ManualSetup } from "@/components/ManualSetup";
-import { button, input } from "@/lib/ui";
+import { describeFit } from "@/lib/planner/onboarding-fit";
+import { button, card, eyebrow, input, label } from "@/lib/ui";
 
 type Intent = {
   targetRoleId: string;
@@ -39,7 +40,63 @@ const ASSUMED_LABELS: Record<string, string> = {
   careerObjective: "your objective"
 };
 
-export function OnboardingFlow({ roles }: { roles: Role[] }) {
+/** "a, b and c" — a bare join left the sentence reading "a, b, so these are…". */
+function joinList(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+const FIT_TONE: Record<string, string> = {
+  comfortable: "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
+  workable: "border-cyan-300/25 bg-cyan-300/10 text-cyan-200",
+  tight: "border-amber-400/30 bg-amber-400/10 text-amber-200"
+};
+
+/**
+ * Named rather than numbered: the middle step only exists when the model had to
+ * guess something critical, and "step 1 of 3" that jumps to 3 reads as a bug.
+ */
+function Steps({ current, withFollowUp }: { current: string; withFollowUp: boolean }) {
+  const steps = ["Your goal", ...(withFollowUp ? ["A quick check"] : []), "Review"];
+
+  return (
+    <ol className="flex flex-wrap items-center gap-2 text-xs">
+      {steps.map((step, index) => (
+        <li className="flex items-center gap-2" key={step}>
+          {index > 0 && <span aria-hidden="true" className="text-slate-600">/</span>}
+          <span
+            aria-current={step === current ? "step" : undefined}
+            className={step === current ? "font-semibold text-ink" : "text-muted"}
+          >
+            {step}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function Heading({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <>
+      <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight text-ink">{title}</h1>
+      <p className="mt-3 text-base leading-7 text-muted">{children}</p>
+    </>
+  );
+}
+
+function ErrorNote({ message }: { message: string }) {
+  return (
+    <p
+      className="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300"
+      role="alert"
+    >
+      {message}
+    </p>
+  );
+}
+
+export function OnboardingFlow({ domains, roles }: { domains: Domain[]; roles: Role[] }) {
   const router = useRouter();
   const [goal, setGoal] = useState("");
   const [replies, setReplies] = useState<Reply[]>([]);
@@ -109,6 +166,16 @@ export function OnboardingFlow({ roles }: { roles: Role[] }) {
     void send(next);
   }
 
+  /** Back to the blank goal box from anywhere, without a reload. */
+  function restart() {
+    setIntent(null);
+    setQuestion(null);
+    setReplies([]);
+    setAnswer("");
+    setAssumed([]);
+    setError(null);
+  }
+
   async function confirm() {
     if (!intent) return;
     setBusy(true);
@@ -137,238 +204,316 @@ export function OnboardingFlow({ roles }: { roles: Role[] }) {
   }
 
   if (manual) {
-    return <ManualSetup onBack={() => { setManual(false); setError(null); }} roles={roles} />;
+    return (
+      <ManualSetup
+        onBack={() => {
+          setManual(false);
+          setError(null);
+        }}
+        roles={roles}
+      />
+    );
   }
 
   if (question) {
     return (
-      <section className="mt-8 space-y-5">
-        <ol className="space-y-4">
-          <li>
-            <p className="text-xs font-medium text-muted">You said</p>
-            <p className="mt-1 text-sm leading-6 text-ink">{goal}</p>
-          </li>
-          {replies.map((reply) => (
-            <li key={reply.question}>
-              <p className="text-xs font-medium text-muted">{reply.question}</p>
-              <p className="mt-1 text-sm leading-6 text-ink">{reply.answer}</p>
+      <>
+        <Steps current="A quick check" withFollowUp />
+        <Heading title="One quick thing">
+          This shapes the whole roadmap, so it&apos;s worth asking rather than guessing.
+        </Heading>
+
+        <section className="mt-8 space-y-5">
+          <ol className="space-y-4">
+            <li>
+              <p className={eyebrow}>You said</p>
+              <p className="mt-1 text-sm leading-6 text-ink">{goal}</p>
             </li>
-          ))}
-        </ol>
+            {replies.map((reply) => (
+              <li key={reply.question}>
+                <p className={eyebrow}>{reply.question}</p>
+                <p className="mt-1 text-sm leading-6 text-ink">{reply.answer}</p>
+              </li>
+            ))}
+          </ol>
 
-        <form className="space-y-3 border-t border-border pt-5" onSubmit={sendAnswer}>
-          <label className="block text-base font-semibold tracking-tight text-ink" htmlFor="follow-up">
-            {question}
-          </label>
-          <input
-            autoFocus
-            className={input}
-            id="follow-up"
-            maxLength={500}
-            onChange={(event) => setAnswer(event.target.value)}
-            placeholder="In your own words…"
-            value={answer}
-          />
+          <form className="space-y-3 border-t border-border pt-5" onSubmit={sendAnswer}>
+            <label className="block text-base font-semibold tracking-tight text-ink" htmlFor="follow-up">
+              {question}
+            </label>
+            <input
+              autoFocus
+              className={input}
+              id="follow-up"
+              maxLength={500}
+              onChange={(event) => setAnswer(event.target.value)}
+              placeholder="In your own words…"
+              value={answer}
+            />
 
-          {error && (
-            <p className="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300" role="alert">
-              {error}
-            </p>
-          )}
+            {error && <ErrorNote message={error} />}
 
-          <div className="flex flex-wrap gap-3">
-            <button className={button.primary} disabled={busy || answer.trim().length === 0} type="submit">
-              {busy ? "Thinking…" : "Continue"}
-            </button>
-            <button
-              className={button.ghost}
-              onClick={() => void send(replies)}
-              type="button"
-              disabled={busy}
-            >
-              Skip this
-            </button>
-          </div>
-        </form>
-      </section>
+            <div className="flex flex-wrap gap-3">
+              <button className={button.primary} disabled={busy || answer.trim().length === 0} type="submit">
+                {busy ? "Thinking…" : "Continue"}
+              </button>
+              <button className={button.ghost} disabled={busy} onClick={() => void send(replies)} type="button">
+                Skip this
+              </button>
+              {/* An unanswerable question used to be a dead end short of a reload. */}
+              <button className={button.ghost} disabled={busy} onClick={restart} type="button">
+                Rewrite my goal
+              </button>
+            </div>
+          </form>
+        </section>
+      </>
     );
   }
 
   if (!intent) {
     return (
-      <form className="mt-8 space-y-4" onSubmit={parseGoal}>
-        <textarea
-          className="h-36 w-full rounded-md border border-border bg-surface-sunken p-3 text-sm text-ink placeholder:text-muted/70 focus:border-teal-soft focus:outline-none"
-          onChange={(e) => setGoal(e.target.value)}
-          placeholder="e.g. I want to become a junior SOC analyst in 12 weeks, about 8 hours a week, free hands-on labs."
-          required
-          value={goal}
-        />
+      <>
+        <Steps current="Your goal" withFollowUp={false} />
+        <Heading title="What are you aiming for?">
+          Describe it in your own words — a sentence is enough. If something important is missing
+          we&apos;ll ask, rather than guess, and you see exactly what we understood before anything is
+          saved.
+        </Heading>
 
-        <div className="flex flex-wrap gap-2">
-          {EXAMPLES.map((example, index) => (
-            <button
-              className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-muted hover:border-teal hover:text-ink"
-              key={example}
-              onClick={() => setGoal(example)}
-              type="button"
-            >
-              {EXAMPLE_LABELS[index]}
+        <form className="mt-8 space-y-4" onSubmit={parseGoal}>
+          <textarea
+            className={`${input} h-36`}
+            onChange={(e) => setGoal(e.target.value)}
+            placeholder="e.g. I want to become a junior SOC analyst in 12 weeks, about 8 hours a week, free hands-on labs."
+            required
+            value={goal}
+          />
+
+          <div className="flex flex-wrap gap-2">
+            {EXAMPLES.map((example, index) => (
+              <button
+                className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-muted hover:border-teal hover:text-ink"
+                key={example}
+                onClick={() => setGoal(example)}
+                type="button"
+              >
+                {EXAMPLE_LABELS[index]}
+              </button>
+            ))}
+          </div>
+
+          {error && <ErrorNote message={error} />}
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button className={button.primary} disabled={busy || goal.trim().length < 3} type="submit">
+              {busy ? "Reading your goal…" : "Continue"}
             </button>
-          ))}
-        </div>
-
-        {error && (
-          <p className="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300" role="alert">
-            {error}
-          </p>
-        )}
-
-        <div className="flex flex-wrap items-center gap-3">
-          <button className={button.primary} disabled={busy || goal.trim().length < 3} type="submit">
-            {busy ? "Reading your goal…" : "Continue"}
-          </button>
-          <button className={button.ghost} onClick={() => setManual(true)} type="button">
-            Or pick a role directly
-          </button>
-        </div>
-      </form>
+            <button className={button.ghost} onClick={() => setManual(true)} type="button">
+              Or pick a role directly
+            </button>
+          </div>
+        </form>
+      </>
     );
   }
 
   const role = roles.find((candidate) => candidate.id === intent.targetRoleId);
+  // `listRoles()` already carries requiredSkills, so the fit recomputes on every
+  // keystroke without a round-trip.
+  const fit = describeFit({
+    requiredSkillCount: role?.requiredSkills.length ?? 0,
+    timelineWeeks: intent.timelineWeeks,
+    weeklyHours: intent.weeklyHours
+  });
+
+  const rolesByDomain = domains
+    .map((domain) => ({ domain, options: roles.filter((r) => r.domainId === domain.id) }))
+    .filter((group) => group.options.length > 0);
 
   return (
-    <section className="mt-8 space-y-5">
-      <div className="rounded-lg border border-border bg-surface p-6">
-        <h2 className="text-lg font-semibold text-ink">Here&apos;s what we understood</h2>
-        <p className="mt-1 text-sm text-muted">
-          Change anything that&apos;s wrong. Nothing is saved until you confirm.
-        </p>
+    <>
+      <Steps current="Review" withFollowUp={replies.length > 0} />
+      <Heading title="Here's what we understood">
+        Change anything that&apos;s wrong. Nothing is saved until you confirm.
+      </Heading>
 
-        {assumed.length > 0 && (
-          <p className="mt-3 rounded-md border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-200">
-            You didn&apos;t mention {assumed.map((field) => ASSUMED_LABELS[field] ?? field).join(", ")}, so
-            these are our best guess. Worth a look before you continue.
-          </p>
-        )}
+      <section className="mt-8 space-y-5">
+        <div className={`${card} p-6`}>
+          {assumed.length > 0 && (
+            <p className="mb-5 rounded-md border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-200">
+              You didn&apos;t mention{" "}
+              {joinList(assumed.map((field) => ASSUMED_LABELS[field] ?? field))}, so{" "}
+              {assumed.length === 1 ? "that's our best guess" : "these are our best guesses"}. Worth a
+              look before you continue.
+            </p>
+          )}
 
-        <div className="mt-5 space-y-4">
-          <label className="block">
-            <span className="text-sm font-medium text-ink">Target role</span>
-            <select
-              className="mt-1 h-10 w-full rounded-md border border-border bg-surface-sunken px-3 text-sm text-ink placeholder:text-muted/70 focus:border-teal-soft focus:outline-none"
-              onChange={(e) => setIntent({ ...intent, targetRoleId: e.target.value })}
-              value={intent.targetRoleId}
-            >
-              {roles.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.title} ({option.domainId})
-                </option>
-              ))}
-            </select>
-            {role && <span className="mt-1 block text-xs text-muted">{role.description}</span>}
-          </label>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block">
-              <span className="text-sm font-medium text-ink">Timeline (weeks)</span>
-              <input
-                className="mt-1 h-10 w-full rounded-md border border-border bg-surface-sunken px-3 text-sm text-ink placeholder:text-muted/70 focus:border-teal-soft focus:outline-none"
-                max={52}
-                min={1}
-                onChange={(e) => setIntent({ ...intent, timelineWeeks: Number(e.target.value) })}
-                type="number"
-                value={intent.timelineWeeks}
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm font-medium text-ink">Hours per week</span>
-              <input
-                className="mt-1 h-10 w-full rounded-md border border-border bg-surface-sunken px-3 text-sm text-ink placeholder:text-muted/70 focus:border-teal-soft focus:outline-none"
-                max={60}
-                min={1}
-                onChange={(e) => setIntent({ ...intent, weeklyHours: Number(e.target.value) })}
-                type="number"
-                value={intent.weeklyHours}
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm font-medium text-ink">Preferred format</span>
+          <div className="space-y-4">
+            <div>
+              <label className={label} htmlFor="target-role">
+                Target role
+              </label>
               <select
-                className="mt-1 h-10 w-full rounded-md border border-border bg-surface-sunken px-3 text-sm text-ink placeholder:text-muted/70 focus:border-teal-soft focus:outline-none"
-                onChange={(e) =>
-                  setIntent({ ...intent, preferences: { ...intent.preferences, format: e.target.value } })
-                }
-                value={intent.preferences.format}
+                className={input}
+                id="target-role"
+                onChange={(e) => setIntent({ ...intent, targetRoleId: e.target.value })}
+                value={intent.targetRoleId}
               >
-                {["any", "lab", "course", "doc", "project", "video"].map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
+                {rolesByDomain.map(({ domain, options }) => (
+                  <optgroup key={domain.id} label={domain.name}>
+                    {options.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.title}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
-            </label>
-            <label className="block">
-              <span className="text-sm font-medium text-ink">Budget</span>
-              <select
-                className="mt-1 h-10 w-full rounded-md border border-border bg-surface-sunken px-3 text-sm text-ink placeholder:text-muted/70 focus:border-teal-soft focus:outline-none"
-                onChange={(e) =>
-                  setIntent({ ...intent, preferences: { ...intent.preferences, cost: e.target.value } })
-                }
-                value={intent.preferences.cost}
-              >
-                {["free", "freemium", "paid", "any"].map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
+              {role && <span className="mt-1.5 block text-xs leading-5 text-muted">{role.description}</span>}
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className={label} htmlFor="timeline-weeks">
+                  Timeline (weeks)
+                </label>
+                <input
+                  className={input}
+                  id="timeline-weeks"
+                  max={52}
+                  min={1}
+                  onChange={(e) => setIntent({ ...intent, timelineWeeks: Number(e.target.value) })}
+                  type="number"
+                  value={intent.timelineWeeks}
+                />
+              </div>
+              <div>
+                <label className={label} htmlFor="weekly-hours">
+                  Hours per week
+                </label>
+                <input
+                  className={input}
+                  id="weekly-hours"
+                  max={60}
+                  min={1}
+                  onChange={(e) => setIntent({ ...intent, weeklyHours: Number(e.target.value) })}
+                  type="number"
+                  value={intent.weeklyHours}
+                />
+              </div>
+              <div>
+                <label className={label} htmlFor="session-length">
+                  Longest single session (hours)
+                </label>
+                <input
+                  className={input}
+                  id="session-length"
+                  max={20}
+                  min={0.5}
+                  onChange={(e) =>
+                    setIntent({
+                      ...intent,
+                      preferences: { ...intent.preferences, maxHoursPerStep: Number(e.target.value) }
+                    })
+                  }
+                  step={0.5}
+                  type="number"
+                  value={intent.preferences.maxHoursPerStep}
+                />
+              </div>
+              <div>
+                <label className={label} htmlFor="format">
+                  Preferred format
+                </label>
+                <select
+                  className={input}
+                  id="format"
+                  onChange={(e) =>
+                    setIntent({ ...intent, preferences: { ...intent.preferences, format: e.target.value } })
+                  }
+                  value={intent.preferences.format}
+                >
+                  {["any", "lab", "course", "doc", "project", "video"].map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={label} htmlFor="budget">
+                  Budget
+                </label>
+                <select
+                  className={input}
+                  id="budget"
+                  onChange={(e) =>
+                    setIntent({ ...intent, preferences: { ...intent.preferences, cost: e.target.value } })
+                  }
+                  value={intent.preferences.cost}
+                >
+                  {["free", "freemium", "paid", "any"].map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="rounded-lg border border-border bg-surface p-6">
-        <label className="flex gap-3">
-          <input
-            checked={consent}
-            className="mt-1 h-4 w-4 shrink-0"
-            onChange={(e) => setConsent(e.target.checked)}
-            type="checkbox"
-          />
-          <span className="text-sm leading-6 text-muted">
-            <span className="font-medium text-ink">Store and analyze my progress.</span> Your diagnostic
-            answers and completed work are used to estimate your skills and adapt your plan. Without
-            this, results are shown but never saved. You can export or delete everything at any time.
-          </span>
-        </label>
-      </div>
+        {/* What the numbers above actually commit the learner to. Arithmetic on
+            the role's own skill count — no model call, no fabricated hours. */}
+        <div className={`rounded-lg border p-5 ${FIT_TONE[fit.verdict]}`} aria-live="polite">
+          <p className="text-sm font-semibold">What that means</p>
+          <p className="mt-2 text-sm leading-6">
+            {role?.title ?? "This role"} needs{" "}
+            <span className="font-semibold tabular-nums">{role?.requiredSkills.length ?? 0} skills</span>. At{" "}
+            <span className="font-semibold tabular-nums">{intent.weeklyHours}h</span> a week for{" "}
+            <span className="font-semibold tabular-nums">{intent.timelineWeeks} weeks</span> you have{" "}
+            <span className="font-semibold tabular-nums">{fit.totalHours} hours</span> in total.
+          </p>
+          <p className="mt-1.5 text-sm leading-6 opacity-90">{fit.note}</p>
+        </div>
 
-      {error && (
-        <p className="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300" role="alert">
-          {error}
-        </p>
-      )}
+        <div className={`${card} p-6`}>
+          <label className="flex gap-3">
+            <input
+              checked={consent}
+              className="mt-1 h-4 w-4 shrink-0"
+              onChange={(e) => setConsent(e.target.checked)}
+              type="checkbox"
+            />
+            <span className="text-sm leading-6 text-muted">
+              <span className="font-medium text-ink">Store and analyze my progress.</span> Your
+              diagnostic answers and completed work are used to estimate your skills and adapt your
+              plan. You can export or delete everything at any time.
+            </span>
+          </label>
 
-      <div className="flex flex-wrap gap-3">
-        <button
-          className="inline-flex h-10 items-center rounded-md bg-teal px-4 text-sm font-semibold text-white hover:bg-teal-strong disabled:opacity-50"
-          disabled={busy}
-          onClick={confirm}
-          type="button"
-        >
-          {busy ? "Saving…" : "Confirm and start diagnostic"}
-        </button>
-        <button
-          className="inline-flex h-10 items-center rounded-md border border-border bg-surface px-4 text-sm font-semibold hover:border-teal"
-          disabled={busy}
-          onClick={() => setIntent(null)}
-          type="button"
-        >
-          Rewrite my goal
-        </button>
-      </div>
-    </section>
+          {/* The box is off by default and the cost of leaving it off is a whole
+              diagnostic answered and discarded, so say so here, not in the small print. */}
+          {!consent && (
+            <p className="mt-4 rounded-md border border-amber-400/30 bg-amber-400/10 p-3 text-sm leading-6 text-amber-200">
+              Leaving this off means your diagnostic answers aren&apos;t saved: you&apos;ll see your
+              results on screen, but readiness stays at 0% and the roadmap can&apos;t adapt as you go.
+            </p>
+          )}
+        </div>
+
+        {error && <ErrorNote message={error} />}
+
+        <div className="flex flex-wrap gap-3">
+          <button className={button.primary} disabled={busy} onClick={confirm} type="button">
+            {busy ? "Saving…" : consent ? "Confirm and start diagnostic" : "Continue without saving results"}
+          </button>
+          <button className={button.secondary} disabled={busy} onClick={restart} type="button">
+            Rewrite my goal
+          </button>
+        </div>
+      </section>
+    </>
   );
 }

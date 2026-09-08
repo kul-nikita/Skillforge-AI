@@ -1,5 +1,5 @@
 import type { LearningResource, ScoreBreakdown } from "@/lib/types";
-import { geminiApiKey, geminiText } from "@/lib/llm/gemini";
+import { llmApiKey, llmText } from "@/lib/llm/client";
 
 export type GroundedFacts = {
   resource: Pick<
@@ -102,14 +102,14 @@ export async function generateGroundedExplanation(
   facts: GroundedFacts,
   fallback: string
 ): Promise<{ text: string; source: "llm" | "fallback"; violations: GroundingViolation[] }> {
-  if (!geminiApiKey()) {
+  if (!llmApiKey()) {
     return { text: fallback, source: "fallback", violations: [] };
   }
 
   const prompt = buildGroundedPrompt(facts);
 
   try {
-    const text = await geminiText({
+    const text = await llmText({
       system: prompt.system,
       user: prompt.user,
       temperature: 0.2,

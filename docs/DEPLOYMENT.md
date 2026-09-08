@@ -41,7 +41,8 @@ following for Production *and* Preview. The names match `.env.example`:
 
 | Variable | Notes |
 |---|---|
-| `GEMINI_API_KEY` | Intent extraction and embeddings. Without it the app still works — explanations fall back to deterministic text. |
+| `CEREBRAS_API_KEY` | Every chat-model call (`gemma-4-31b`): intent extraction, explanations, JD parsing, mentor/coach, interview. Without it the app still works — explanations fall back to deterministic text. |
+| `GEMINI_API_KEY` | Embeddings only — Cerebras serves no embedding model, so semantic search still calls `gemini-embedding-001`. |
 | `MONGODB_URI` | Full `mongodb+srv://` connection string. |
 | `NEO4J_URI` | `neo4j+s://…` |
 | `NEO4J_USER` | usually `neo4j` |
