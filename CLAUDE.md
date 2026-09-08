@@ -940,6 +940,33 @@ knows where things stand without re-deriving it.
   answering; dashboard showing readiness, skills, milestones and the next
   action.
 
+- 2026-09-08: **Everything previously unproven is now proven live.** A working
+  Gemini key arrived, and the three AI paths that had spent the whole session on
+  their fallbacks were exercised for real.
+  The conversation works: *"idk something with computers, i like figuring out how
+  people break into things"* -> "Are you interested in a role focused on finding
+  security vulnerabilities?" -> *"defending them i think, spotting attacks"* ->
+  "How many hours a week can you dedicate?" -> *"maybe 6 hours a week, over about
+  3 months"* -> **Junior SOC Analyst, 12 weeks, 6 h/wk**, objective and interests
+  extracted, and the remaining guesses still listed in `assumed` so the review
+  card flags them.
+  **A real bug showed up in the first run.** The model guessed both the timeline
+  and the weekly budget and still returned `followUpQuestion: null`, so the
+  conversation ended a turn early with two critical fields silently invented.
+  Whether to ask is our decision, not the model's: `followUpFor()` now supplies a
+  default question per critical field and only borrows the model's wording when
+  it offered one. The second run asked both questions.
+  The coach answered from the real stage, and the mentor both **answered**
+  ("focus on Network Fundamentals... Networking Basics, foundational for a Junior
+  SOC Analyst" — every name from the fact pack) and **refused** a salary question
+  with the grounded refusal. Worth knowing for a demo: the free tier limits
+  requests per *minute*, and `postJsonWithRetry` backs off 500ms then 1s, which
+  cannot outwait a 60-second window — a burst of onboarding plus coach plus
+  mentor calls will show fallbacks. Failing fast to deterministic text is the
+  right call for an interactive request, so this is documented rather than
+  "fixed" by making users wait a minute.
+  201 unit tests, typecheck, lint and build green.
+
 - [x] Repo scaffolded; Neo4j, MongoDB, and Qdrant all connected
 - [x] Skill graph + prerequisite edges seeded in Neo4j — 9 domains, 19 roles,
       96 skills

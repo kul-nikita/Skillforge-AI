@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/session";
 import { listRoles } from "@/lib/graph/queries";
-import { extractLearnerIntent, needsFollowUp } from "@/lib/llm/intent-extraction";
+import { extractLearnerIntent, followUpFor, needsFollowUp } from "@/lib/llm/intent-extraction";
 import { GeminiError } from "@/lib/llm/gemini";
 import { upsertProfile } from "@/lib/db/learners";
 import { setConsent } from "@/lib/db/users";
@@ -55,10 +55,12 @@ export async function POST(request: Request) {
   try {
     const intent = await extractLearnerIntent(buildTranscript(goal, replies), roles);
 
-    if (needsFollowUp(intent.assumed, replies.length, intent.followUpQuestion)) {
+    const question = followUpFor(intent.assumed, intent.followUpQuestion);
+
+    if (question && needsFollowUp(intent.assumed, replies.length)) {
       // Guessing the role, the deadline or the weekly budget shapes everything
       // downstream, so ask rather than present the guess as understanding.
-      return NextResponse.json({ done: false, question: intent.followUpQuestion });
+      return NextResponse.json({ done: false, question });
     }
 
     const role = roles.find((candidate) => candidate.id === intent.targetRoleId)!;

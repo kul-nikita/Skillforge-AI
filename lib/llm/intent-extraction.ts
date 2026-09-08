@@ -54,12 +54,34 @@ export const CRITICAL_FIELDS = ["targetRoleId", "timelineWeeks", "weeklyHours"] 
 /** At most two follow-ups: past that it is an interrogation, not an onboarding. */
 export const MAX_FOLLOW_UPS = 2;
 
-export function needsFollowUp(assumed: string[], askedSoFar: number, question: string | null): boolean {
-  if (askedSoFar >= MAX_FOLLOW_UPS || !question) {
-    return false;
+export function criticalGuesses(assumed: string[]): string[] {
+  return (CRITICAL_FIELDS as readonly string[]).filter((field) => assumed.includes(field));
+}
+
+export function needsFollowUp(assumed: string[], askedSoFar: number): boolean {
+  return askedSoFar < MAX_FOLLOW_UPS && criticalGuesses(assumed).length > 0;
+}
+
+/**
+ * Observed in a live run: the model guessed both the timeline and the weekly
+ * budget and still returned `followUpQuestion: null`, so the conversation ended
+ * one turn early. Whether a question gets asked is our decision; only its
+ * wording is the model's, and there is a sensible default for each field.
+ */
+const DEFAULT_QUESTIONS: Record<string, string> = {
+  targetRoleId: "Which kind of work appeals most — defending systems, building them, or working with data?",
+  timelineWeeks: "Roughly how long do you want to give this?",
+  weeklyHours: "About how many hours a week can you realistically spend?"
+};
+
+export function followUpFor(assumed: string[], question: string | null): string | null {
+  const missing = criticalGuesses(assumed);
+
+  if (missing.length === 0) {
+    return null;
   }
 
-  return assumed.some((field) => (CRITICAL_FIELDS as readonly string[]).includes(field));
+  return question?.trim() ? question : (DEFAULT_QUESTIONS[missing[0]] ?? null);
 }
 
 export type LearnerIntent = z.infer<ReturnType<typeof buildIntentSchema>>;

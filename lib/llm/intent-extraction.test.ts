@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { CRITICAL_FIELDS, MAX_FOLLOW_UPS, buildIntentSchema, needsFollowUp } from "@/lib/llm/intent-extraction";
+import {
+  CRITICAL_FIELDS,
+  MAX_FOLLOW_UPS,
+  buildIntentSchema,
+  followUpFor,
+  needsFollowUp
+} from "@/lib/llm/intent-extraction";
 import type { Role } from "@/lib/types";
 
 const roles: Role[] = [
@@ -76,29 +82,38 @@ describe("learner intent validation (LLM trust boundary)", () => {
 describe("follow-up decision", () => {
   it("asks when the model guessed something that shapes the roadmap", () => {
     for (const field of CRITICAL_FIELDS) {
-      expect(needsFollowUp([field], 0, "How long do you have?")).toBe(true);
+      expect(needsFollowUp([field], 0)).toBe(true);
     }
   });
 
   it("does not ask about guesses that the diagnostic will correct anyway", () => {
     // Format, style and prior skills are all re-measured downstream; the role,
     // the deadline and the weekly budget are not.
-    expect(needsFollowUp(["learningStyle", "currentSkills", "preferences"], 0, "Anything else?")).toBe(false);
+    expect(needsFollowUp(["learningStyle", "currentSkills", "preferences"], 0)).toBe(false);
   });
 
   it("does not ask when nothing was guessed", () => {
-    expect(needsFollowUp([], 0, "How long do you have?")).toBe(false);
+    expect(needsFollowUp([], 0)).toBe(false);
+    expect(followUpFor([], "How long do you have?")).toBeNull();
   });
 
-  it("does not ask without a question to put", () => {
-    expect(needsFollowUp(["weeklyHours"], 0, null)).toBe(false);
-    expect(needsFollowUp(["weeklyHours"], 0, "")).toBe(false);
+  it("supplies its own question when the model declines to", () => {
+    // Seen live: the model guessed both the timeline and the weekly budget and
+    // still returned followUpQuestion: null, ending the conversation a turn
+    // early. Whether to ask is our decision; only the wording is the model's.
+    expect(followUpFor(["weeklyHours"], null)).toMatch(/hours a week/i);
+    expect(followUpFor(["timelineWeeks"], "")).toMatch(/how long/i);
+    expect(followUpFor(["targetRoleId"], "   ")).toMatch(/appeals most/i);
+  });
+
+  it("prefers the model's wording when it gave one", () => {
+    expect(followUpFor(["weeklyHours"], "How much time can you spare?")).toBe("How much time can you spare?");
   });
 
   it("stops after the cap, however much is still assumed", () => {
-    expect(needsFollowUp(["targetRoleId"], MAX_FOLLOW_UPS - 1, "One more?")).toBe(true);
-    expect(needsFollowUp(["targetRoleId"], MAX_FOLLOW_UPS, "One more?")).toBe(false);
-    expect(needsFollowUp(["targetRoleId"], MAX_FOLLOW_UPS + 5, "One more?")).toBe(false);
+    expect(needsFollowUp(["targetRoleId"], MAX_FOLLOW_UPS - 1)).toBe(true);
+    expect(needsFollowUp(["targetRoleId"], MAX_FOLLOW_UPS)).toBe(false);
+    expect(needsFollowUp(["targetRoleId"], MAX_FOLLOW_UPS + 5)).toBe(false);
   });
 });
 
@@ -118,6 +133,7 @@ describe("assumption reporting", () => {
     });
 
     expect(parsed.assumed).toEqual(["weeklyHours", "timelineWeeks"]);
-    expect(needsFollowUp(parsed.assumed, 0, parsed.followUpQuestion)).toBe(true);
+    expect(needsFollowUp(parsed.assumed, 0)).toBe(true);
+    expect(followUpFor(parsed.assumed, parsed.followUpQuestion)).toBe("How many hours a week can you give it?");
   });
 });
