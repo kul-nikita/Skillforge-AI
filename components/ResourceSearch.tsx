@@ -42,7 +42,7 @@ export function ResourceSearch() {
   }
 
   return (
-    <article className="rounded-lg border border-border bg-surface p-5">
+    <article className="rounded-lg border border-white/10 bg-surface/95 p-5 shadow-card">
       <div className="flex items-center gap-2">
         <Search aria-hidden="true" className="text-teal" size={20} />
         <h2 className="text-lg font-semibold">Find something specific</h2>

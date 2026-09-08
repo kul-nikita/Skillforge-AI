@@ -11,11 +11,11 @@ const LABELS: Array<[keyof Omit<ScoreBreakdownType, "total">, string]> = [
 
 export function ScoreBreakdown({ score }: { score: ScoreBreakdownType }) {
   return (
-    <dl className="grid gap-3 sm:grid-cols-2">
+    <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
       {LABELS.map(([key, label]) => (
-        <div className="rounded-md border border-border bg-surface p-3" key={key}>
+        <div className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-2" key={key}>
           <dt className="text-xs font-medium uppercase tracking-wide text-muted">{label}</dt>
-          <dd className="mt-1 text-lg font-semibold text-ink">{Math.round(score[key] * 100)}%</dd>
+          <dd className="mt-0.5 text-base font-semibold text-ink">{Math.round(score[key] * 100)}%</dd>
         </div>
       ))}
     </dl>

@@ -50,7 +50,7 @@ export function SkillHeatmap({
         prerequisite, not on you.
       </p>
 
-      <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
         {tiles.map((tile) => {
           const percent = Math.round(tile.currentMastery * 100);
           return (

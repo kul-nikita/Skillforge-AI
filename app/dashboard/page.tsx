@@ -90,91 +90,77 @@ export default async function DashboardPage() {
         className="min-h-screen bg-[linear-gradient(180deg,#050816_0%,#07101f_42%,#050816_100%)] text-ink"
         id="main"
       >
-        <section className="relative overflow-hidden border-b border-white/10">
-          <div
-            aria-hidden="true"
-            className="absolute inset-0 opacity-[0.18]"
-            style={{
-              backgroundImage:
-                "linear-gradient(rgba(34,211,238,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(168,85,247,0.12) 1px, transparent 1px)",
-              backgroundSize: "72px 72px"
-            }}
-          />
-          <div className="relative mx-auto grid max-w-7xl gap-8 px-6 py-8 lg:grid-cols-[1fr_380px] lg:items-stretch lg:py-10">
-            <div className="flex min-h-[360px] flex-col justify-between rounded-lg border border-white/10 bg-white/[0.035] p-6 shadow-lift backdrop-blur md:p-8">
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-md border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-semibold uppercase text-cyan-200">
-                  <Sparkles aria-hidden="true" size={14} />
-                  {domainName}
-                </div>
-                <h1 className="mt-5 max-w-4xl font-display text-4xl font-semibold tracking-normal text-white md:text-6xl">
-                  {roadmap.role.title} command center
-                </h1>
-                <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300">
-                  Your next moves, open skill gaps, verified recommendations, and portfolio proof in one
-                  prerequisite-aware workspace.
-                </p>
+        <section className="mx-auto max-w-7xl px-6 pt-8">
+          <div className="flex flex-col gap-6 border-b border-white/10 pb-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0">
+              <div className="inline-flex items-center gap-2 rounded-md border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-cyan-200">
+                <Sparkles aria-hidden="true" size={13} />
+                {domainName}
               </div>
-
-              {Object.keys(mastery).length === 0 ? (
-                <div className="mt-8 rounded-lg border border-amber-300/25 bg-amber-300/10 p-4 text-sm leading-6 text-amber-100">
-                  No diagnostic is on record yet, so this view starts from zero mastery. Run the diagnostic
-                  to replace the estimate with your real signal.
-                </div>
-              ) : (
-                <div className="mt-8 grid gap-3 text-sm text-slate-300 sm:grid-cols-3">
-                  <MiniSignal label="Weekly pace" value={`${weeklyHours}h`} />
-                  <MiniSignal label="Evidence" value={`${evidence.length}`} />
-                  <MiniSignal label="Open gaps" value={`${roadmap.gaps.length}`} />
-                </div>
-              )}
+              <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight text-white md:text-4xl">
+                {roadmap.role.title}
+              </h1>
+              <p className="mt-2 text-sm leading-6 text-muted">
+                {weeklyHours}h per week
+                <span className="px-2 text-slate-600">/</span>
+                {roadmap.gaps.length} open gap{roadmap.gaps.length === 1 ? "" : "s"}
+                <span className="px-2 text-slate-600">/</span>
+                {evidence.length} evidence item{evidence.length === 1 ? "" : "s"}
+              </p>
             </div>
 
-            <aside className="rounded-lg border border-white/10 bg-[#091126]/90 p-6 shadow-lift backdrop-blur">
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-cyan-700 px-4 text-sm font-semibold text-white transition hover:bg-cyan-800"
+                href="/diagnostic"
+              >
+                <Compass aria-hidden="true" size={16} />
+                Run diagnostic
+              </Link>
+              <Link
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-white/10 bg-white/5 px-4 text-sm font-semibold text-slate-100 transition hover:border-cyan-300/50 hover:bg-cyan-300/10"
+                href="/evidence"
+              >
+                <FileCheck2 aria-hidden="true" size={16} />
+                Evidence wallet
+              </Link>
+              {isAdmin(user) ? (
+                <Link
+                  className="inline-flex h-10 items-center justify-center rounded-md border border-white/10 bg-white/5 px-4 text-sm font-semibold text-slate-100 transition hover:border-cyan-300/50 hover:bg-cyan-300/10"
+                  href="/admin"
+                >
+                  Catalog admin
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-7xl px-6 py-6">
+          {Object.keys(mastery).length === 0 ? (
+            <div className="mb-4 rounded-md border border-amber-300/25 bg-amber-300/10 px-4 py-3 text-sm leading-6 text-amber-100">
+              No diagnostic is on record yet, so this view starts from zero mastery. Run the diagnostic to
+              replace the estimate with your real signal.
+            </div>
+          ) : null}
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <article className="rounded-lg border border-white/10 bg-surface/90 p-4 shadow-card md:col-span-2 xl:col-span-1">
               <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium text-slate-400">Role readiness</p>
-                  <p className="mt-1 text-5xl font-semibold text-white">{readinessPercent}%</p>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-muted">Role readiness</p>
+                  <p className="mt-2 text-3xl font-semibold text-white">{readinessPercent}%</p>
+                  <p className="mt-1 text-xs text-slate-500">Weighted by skill importance</p>
                 </div>
                 <ProgressRing value={readinessPercent} />
               </div>
-              <div className="mt-6 h-2 overflow-hidden rounded-full bg-white/10">
+              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-cyan-300 via-emerald-300 to-amber-200"
                   style={{ width: `${readinessPercent}%` }}
                 />
               </div>
-
-              <div className="mt-6 space-y-3">
-                <Link
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-cyan-700 px-4 text-sm font-semibold text-white transition hover:bg-cyan-800"
-                  href="/diagnostic"
-                >
-                  <Compass aria-hidden="true" size={17} />
-                  Run adaptive diagnostic
-                </Link>
-                <Link
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-white/10 bg-white/5 px-4 text-sm font-semibold text-slate-100 transition hover:border-cyan-300/50 hover:bg-cyan-300/10"
-                  href="/evidence"
-                >
-                  <FileCheck2 aria-hidden="true" size={17} />
-                  View evidence wallet
-                </Link>
-                {isAdmin(user) ? (
-                  <Link
-                    className="inline-flex h-11 w-full items-center justify-center rounded-md border border-white/10 bg-white/5 px-4 text-sm font-semibold text-slate-100 transition hover:border-cyan-300/50 hover:bg-cyan-300/10"
-                    href="/admin"
-                  >
-                    Catalog admin
-                  </Link>
-                ) : null}
-              </div>
-            </aside>
-          </div>
-        </section>
-
-        <section className="mx-auto max-w-7xl px-6 py-6">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            </article>
             <StatTile
               detail="Cleared for this role"
               icon={<ShieldCheck aria-hidden="true" size={19} />}
@@ -206,167 +192,184 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        <section className="mx-auto grid max-w-7xl gap-6 px-6 pb-10 xl:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)]">
-          <div className="space-y-6">
-            <article className="rounded-lg border border-white/10 bg-surface/95 p-5 shadow-card">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <div className="flex items-center gap-2 text-cyan-200">
-                    <Compass aria-hidden="true" size={20} />
-                    <h2 className="text-lg font-semibold text-white">Next best move</h2>
-                  </div>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-                    Focus on the first skill that clears the prerequisite gate. The recommendation list below
-                    is scored for your stated pace, format, cost, and current mastery.
-                  </p>
-                </div>
-                <span className="inline-flex shrink-0 rounded-md border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-sm font-semibold text-cyan-100">
-                  {nextGapName}
-                </span>
+        <section className="mx-auto grid max-w-7xl gap-6 px-6 pb-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(340px,1fr)]">
+          <article className="rounded-lg border border-white/10 bg-surface/95 shadow-card">
+            <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
+              <div className="flex items-center gap-2 text-cyan-200">
+                <Compass aria-hidden="true" size={18} />
+                <h2 className="text-base font-semibold text-white">Next best move</h2>
               </div>
+              <span className="inline-flex rounded-md border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-xs font-semibold text-cyan-100">
+                {nextGapName}
+              </span>
+            </header>
+
+            <div className="p-5">
+              <p className="text-sm leading-6 text-muted">
+                The first skill that clears the prerequisite gate. Each option is scored against your
+                pace, format, cost, and current mastery.
+              </p>
 
               {recommendations.length === 0 ? (
-                <p className="mt-5 rounded-md border border-white/10 bg-white/5 p-4 text-sm text-muted">
+                <p className="mt-4 rounded-md border border-white/10 bg-white/5 p-4 text-sm text-muted">
                   No resource clears the prerequisite gate for your top gap yet.
                 </p>
               ) : (
-                <div className="mt-6 space-y-6">
+                <div className="mt-4 space-y-4">
                   {recommendations.map((item) => (
-                    <div className="border-t border-white/10 pt-6 first:border-t-0 first:pt-0" key={item.resource.id}>
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div
+                      className="rounded-lg border border-white/10 bg-white/[0.03] p-4"
+                      key={item.resource.id}
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase text-slate-400">
+                          <div className="flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-400">
                             <span>{item.resource.provider}</span>
                             <span className="h-1 w-1 rounded-full bg-slate-600" />
                             <span>{item.explanation.estimatedTime}</span>
                             <span className="h-1 w-1 rounded-full bg-slate-600" />
                             <span>{item.resource.costType}</span>
                           </div>
-                          <h3 className="mt-2 text-2xl font-semibold tracking-normal text-white">
+                          <h3 className="mt-2 text-lg font-semibold leading-6 text-white">
                             {item.resource.title}
                           </h3>
-                          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">
+                          <p className="mt-2 text-sm leading-6 text-muted">
                             {item.explanation.whatGapItCloses}
                           </p>
                         </div>
                         <a
-                          className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-cyan-700 px-4 text-sm font-semibold text-white transition hover:bg-cyan-800"
+                          className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md bg-cyan-700 px-3.5 text-sm font-semibold text-white transition hover:bg-cyan-800"
                           href={item.resource.url}
                           rel="noreferrer"
                           target="_blank"
                         >
                           Open
-                          <ArrowUpRight aria-hidden="true" size={16} />
+                          <ArrowUpRight aria-hidden="true" size={15} />
                         </a>
                       </div>
-                      {firstUnlockedGap && (
-                        <div className="mt-4">
-                          <ExplainButton resourceId={item.resource.id} skillId={firstUnlockedGap.skill.id} />
-                        </div>
-                      )}
+
                       <div className="mt-4">
                         <ScoreBreakdown score={item.score} />
                       </div>
+
+                      {firstUnlockedGap && (
+                        <div className="mt-3">
+                          <ExplainButton resourceId={item.resource.id} skillId={firstUnlockedGap.skill.id} />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               )}
-            </article>
+            </div>
+          </article>
 
-            <article className="rounded-lg border border-white/10 bg-surface/95 p-5 shadow-card">
+          <article className="rounded-lg border border-white/10 bg-surface/95 shadow-card">
+            <header className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
               <div className="flex items-center gap-2 text-cyan-200">
-                <Route aria-hidden="true" size={20} />
-                <h2 className="text-lg font-semibold text-white">Roadmap queue</h2>
+                <Route aria-hidden="true" size={18} />
+                <h2 className="text-base font-semibold text-white">Roadmap queue</h2>
               </div>
-              <ol className="mt-5 space-y-3">
-                {roadmap.gaps.slice(0, 7).map((gap, index) => {
-                  const unlocked = gap.skill.prerequisites.every((id) => (mastery[id] ?? 0) >= 0.6);
-                  return (
-                    <li className="rounded-md border border-white/10 bg-white/[0.03] p-4" key={gap.skill.id}>
-                      <div className="flex items-start gap-4">
-                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-cyan-300/10 text-sm font-semibold text-cyan-100">
-                          {index + 1}
+              <span className="rounded-md bg-white/5 px-2 py-1 text-xs font-semibold text-slate-300">
+                {roadmap.gaps.length} skills
+              </span>
+            </header>
+
+            <ol className="divide-y divide-white/10">
+              {roadmap.gaps.slice(0, 7).map((gap, index) => {
+                const unlocked = gap.skill.prerequisites.every((id) => (mastery[id] ?? 0) >= 0.6);
+                return (
+                  <li className="flex items-start gap-3 px-5 py-3.5" key={gap.skill.id}>
+                    <span
+                      className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-md text-xs font-semibold ${
+                        unlocked ? "bg-emerald-300/10 text-emerald-200" : "bg-white/5 text-slate-400"
+                      }`}
+                    >
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <h3 className="truncate text-sm font-semibold text-white">{gap.skill.name}</h3>
+                        <span className="shrink-0 text-xs font-semibold text-slate-400">
+                          {Math.round(gap.currentMastery * 100)}%
                         </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center justify-between gap-3">
-                            <h3 className="font-semibold text-white">{gap.skill.name}</h3>
-                            <div className="flex items-center gap-2">
-                              <span className="rounded-md bg-white/5 px-2 py-1 text-xs font-semibold text-slate-200">
-                                {Math.round(gap.currentMastery * 100)}%
-                              </span>
-                              <span
-                                className={`rounded-md px-2 py-1 text-xs font-semibold ${
-                                  unlocked
-                                    ? "bg-emerald-300/10 text-emerald-200"
-                                    : "bg-violet-300/10 text-violet-200"
-                                }`}
-                              >
-                                {unlocked ? "Unlocked" : "Locked"}
-                              </span>
-                            </div>
-                          </div>
-                          <p className="mt-2 text-sm leading-6 text-muted">{gap.reason}</p>
-                        </div>
                       </div>
-                    </li>
-                  );
-                })}
-              </ol>
-            </article>
-          </div>
+                      <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/10">
+                        <div
+                          className={`h-full rounded-full ${unlocked ? "bg-cyan-300" : "bg-violet-300/60"}`}
+                          style={{ width: `${Math.max(Math.round(gap.currentMastery * 100), 3)}%` }}
+                        />
+                      </div>
+                      <p className="mt-2 text-xs leading-5 text-muted">{gap.reason}</p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </article>
+        </section>
 
-          <div className="space-y-6">
-            <article className="rounded-lg border border-white/10 bg-surface/95 p-5 shadow-card">
+        <section className="mx-auto max-w-7xl px-6 pb-6">
+          <SkillHeatmap gaps={roadmap.gaps} mastered={roadmap.mastered} mastery={mastery} />
+        </section>
+
+        {timelineData && role && (
+          <section className="mx-auto max-w-7xl px-6 pb-6">
+            <ReadinessTimeline
+              data={{
+                role: { id: role.id, title: role.title },
+                prediction: timelineData,
+                currentReadiness: roadmap.readiness
+              }}
+            />
+          </section>
+        )}
+
+        <section className="mx-auto grid max-w-7xl gap-6 px-6 pb-12 lg:grid-cols-2">
+          <article className="rounded-lg border border-white/10 bg-surface/95 shadow-card">
+            <header className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
               <div className="flex items-center gap-2 text-amber-200">
-                <Award aria-hidden="true" size={20} />
-                <h2 className="text-lg font-semibold text-white">Evidence wallet</h2>
+                <Award aria-hidden="true" size={18} />
+                <h2 className="text-base font-semibold text-white">Evidence wallet</h2>
               </div>
-              <div className="mt-4 grid gap-4 sm:grid-cols-[140px_1fr]">
-                <div className="rounded-md border border-white/10 bg-amber-300/10 p-4">
-                  <p className="text-4xl font-semibold text-white">{evidence.length}</p>
-                  <p className="mt-1 text-sm text-amber-100">
-                    completed milestone{evidence.length === 1 ? "" : "s"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm leading-6 text-muted">
-                    Each completed resource can become recruiter-readable proof when the post-check is graded.
-                  </p>
-                  <ul className="mt-4 space-y-2 text-sm">
-                    {evidence.slice(0, 3).map((item) => (
-                      <li className="flex items-center justify-between gap-3 rounded-md bg-white/[0.03] px-3 py-2" key={item.id}>
-                        <span className="min-w-0 truncate text-ink">{item.summary}</span>
-                        <span className="shrink-0 rounded-md bg-white/5 px-2 py-1 font-medium text-slate-200">
-                          {Math.round(item.rubricScore * 100)}%
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                  <Link
-                    className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-cyan-200 hover:text-cyan-100"
-                    href="/evidence"
-                  >
-                    Open full wallet
-                    <ArrowUpRight aria-hidden="true" size={15} />
-                  </Link>
-                </div>
-              </div>
-            </article>
+              <span className="rounded-md border border-amber-300/20 bg-amber-300/10 px-2.5 py-1 text-xs font-semibold text-amber-100">
+                {evidence.length} milestone{evidence.length === 1 ? "" : "s"}
+              </span>
+            </header>
+            <div className="p-5">
+              <p className="text-sm leading-6 text-muted">
+                Each completed resource becomes recruiter-readable proof once the post-check is graded.
+              </p>
+              {evidence.length === 0 ? (
+                <p className="mt-4 rounded-md border border-white/10 bg-white/5 p-4 text-sm text-muted">
+                  Nothing here yet. Finish a recommended resource and pass its post-check.
+                </p>
+              ) : (
+                <ul className="mt-4 space-y-2 text-sm">
+                  {evidence.slice(0, 4).map((item) => (
+                    <li
+                      className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2.5"
+                      key={item.id}
+                    >
+                      <span className="min-w-0 truncate text-ink">{item.summary}</span>
+                      <span className="shrink-0 rounded-md bg-white/5 px-2 py-1 text-xs font-semibold text-slate-200">
+                        {Math.round(item.rubricScore * 100)}%
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <Link
+                className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-cyan-200 hover:text-cyan-100"
+                href="/evidence"
+              >
+                Open full wallet
+                <ArrowUpRight aria-hidden="true" size={15} />
+              </Link>
+            </div>
+          </article>
 
-            <SkillHeatmap gaps={roadmap.gaps} mastered={roadmap.mastered} mastery={mastery} />
-
-            {timelineData && role && (
-              <ReadinessTimeline
-                data={{
-                  role: { id: role.id, title: role.title },
-                  prediction: timelineData,
-                  currentReadiness: roadmap.readiness
-                }}
-              />
-            )}
-
-            <ResourceSearch />
-          </div>
+          <ResourceSearch />
         </section>
       </main>
     </>
@@ -377,23 +380,12 @@ function ProgressRing({ value }: { value: number }) {
   return (
     <div
       aria-hidden="true"
-      className="grid h-28 w-28 shrink-0 place-items-center rounded-full"
+      className="grid h-20 w-20 shrink-0 place-items-center rounded-full"
       style={{
         background: `conic-gradient(#67e8f9 ${value * 3.6}deg, rgba(255,255,255,0.08) 0deg)`
       }}
     >
-      <div className="grid h-20 w-20 place-items-center rounded-full bg-[#091126] text-sm font-semibold text-cyan-100">
-        {value}%
-      </div>
-    </div>
-  );
-}
-
-function MiniSignal({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-white/10 bg-white/[0.035] p-3">
-      <p className="text-xs font-medium uppercase text-slate-500">{label}</p>
-      <p className="mt-1 text-lg font-semibold text-white">{value}</p>
+      <div className="h-14 w-14 rounded-full bg-surface" />
     </div>
   );
 }
