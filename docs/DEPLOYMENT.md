@@ -1,22 +1,25 @@
 # Deployment
 
 The app is a single Next.js deployable. Every store credential is read inside a
-request handler, so **the build needs no secrets** — CI proves this by building
-without any.
+request handler, so **the build needs no secrets**.
 
 ## Pipeline
 
-| Workflow | Trigger | What it does |
-|---|---|---|
-| `.github/workflows/ci.yml` | every push and PR | typecheck → lint → 112 unit tests → build with no secrets |
-| `.github/workflows/deploy.yml` | after CI succeeds | deploys the default branch to production, every other branch to a preview URL |
+Deployment is Vercel's Git integration: connect the repository once in the
+Vercel dashboard and every push to the default branch ships to production, with
+other branches getting preview URLs. There are no GitHub Actions workflows in
+this repo.
 
-Deploy runs on `workflow_run` after CI, so **a red build is never deployed**.
-Without `VERCEL_TOKEN` set it logs a notice and skips, rather than failing.
+**This has to be connected for anything to deploy.** If pushes are landing on
+`main` and the live site does not change, the repository is not linked — check
+Vercel → Project → Settings → Git.
 
-If you would rather let Vercel drive deployments, delete `deploy.yml` and
-connect the repository in the Vercel dashboard. That is simpler, but it deploys
-on push regardless of whether tests passed.
+The trade-off of driving deploys this way is that Vercel ships whatever you push
+without waiting for tests. Run the checks before you push:
+
+```bash
+npm run typecheck && npm run lint && npm run test && npm run build
+```
 
 ## One-time setup
 
@@ -76,13 +79,11 @@ npm run db:seed:all     # graph → mongo → vector, in that order
 npm run graph:verify    # asserts the prerequisite gate against the live graph
 ```
 
-### 5. (Only if using `deploy.yml`) add GitHub secrets
+### 5. Connect the repository to Vercel
 
-**Settings → Secrets and variables → Actions**:
-
-- `VERCEL_TOKEN` — from Vercel → Account Settings → Tokens
-- `VERCEL_ORG_ID` — from `.vercel/project.json` after `vercel link`
-- `VERCEL_PROJECT_ID` — same file
+**Vercel → Project → Settings → Git → Connect Git Repository.** Pick this repo
+and set the production branch to `main`. From then on a push deploys itself;
+nothing else is required.
 
 ## Notes on running serverless
 

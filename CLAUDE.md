@@ -844,6 +844,25 @@ knows where things stand without re-deriving it.
   work is still open (a dashboard render makes ~6 Neo4j round trips, two of them
   redundant).
 
+- 2026-09-08: **Removed the GitHub Actions workflows.** Deployment is Vercel's
+  Git integration now; `ci.yml` and `deploy.yml` are gone and README/DEPLOYMENT
+  say so. Worth recording *why the pipeline never worked*: `deploy.yml` skipped
+  every step and still exited 0 when `VERCEL_TOKEN` was absent, so a pipeline
+  that had never deployed anything reported green on every run.
+  **The Vercel project is not connected to this repository either.** `main` was
+  pushed twice with the navbar logo removed and the live site still served the
+  old markup, which is the evidence: with the workflows gone there is no deploy
+  path at all until someone connects the repo in Vercel -> Project -> Settings
+  -> Git. Once connected, a push deploys itself and nothing else is needed.
+  The trade-off taken deliberately: Vercel ships whatever is pushed without
+  waiting for tests, so the checks are a local step now
+  (`npm run typecheck && npm run lint && npm run test && npm run build`).
+  Verified locally after the change: typecheck, lint, 181 unit tests, production
+  build, and a 23/23 end-to-end run covering the whole loop — landing page,
+  signup, first-run dashboard with no fabricated role, journey strip advancing
+  1 -> 2 -> 3 -> underway, a 14-question diagnostic, a graded completion scoring
+  1.0 and minting evidence, and every authenticated route rendering.
+
 - [x] Repo scaffolded; Neo4j, MongoDB, and Qdrant all connected
 - [x] Skill graph + prerequisite edges seeded in Neo4j — 9 domains, 19 roles,
       96 skills

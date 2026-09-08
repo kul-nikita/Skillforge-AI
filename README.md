@@ -280,14 +280,17 @@ The suite is not decorative — most of it exists because something broke.
 
 ## Deploying
 
-CI (`.github/workflows/ci.yml`) runs typecheck → lint → tests → build on every
-push. **The build step deliberately gets no secrets:** every store credential is
-read inside a request handler, so a build that needs one has leaked a database
-call into module scope. Failing there is the point.
+Deployment is Vercel's Git integration: connect the repo once and every push to
+`main` ships itself. There are no CI workflows in this repo, so run the checks
+yourself before pushing:
 
-`.github/workflows/deploy.yml` deploys only after CI succeeds, so a red build is
-never shipped — the one real advantage over Vercel's own Git integration, which
-deploys on push regardless of test results.
+```bash
+npm run typecheck && npm run lint && npm run test && npm run build
+```
+
+**The build deliberately needs no secrets:** every store credential is read
+inside a request handler, so a build that needs one has leaked a database call
+into module scope.
 
 Full setup, including the MongoDB Atlas `0.0.0.0/0` network rule that Vercel's
 lack of stable outbound IPs requires: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
