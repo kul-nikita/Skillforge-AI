@@ -4,6 +4,11 @@ import { findViolations } from "./grounded-explanations";
 
 const FACTS: MentorFacts = {
   roleTitle: "SOC Analyst",
+  objective: "Become a junior SOC analyst",
+  experienceLevel: "beginner",
+  interests: ["threat detection"],
+  knownSkills: ["Python"],
+  completedCourses: ["CS50"],
   readinessPercent: 24,
   masteredSkills: ["Networking Basics"],
   gaps: [
@@ -23,6 +28,12 @@ describe("mentor grounding", () => {
 
   it("permits a duration restated in hours", () => {
     expect(check("Splunk Search Tutorial takes about 4 hours.")).toEqual([]);
+  });
+
+  it("permits the learner's own stated profile without widening the number set", () => {
+    // Strings the learner supplied are quotable; they add no permitted numbers.
+    expect(check("You said you want to become a junior SOC analyst and already know Python.")).toEqual([]);
+    expect(check("You have done 3 courses.")).toEqual([{ kind: "number", detail: "3" }]);
   });
 
   it("permits counting the collections it was given", () => {

@@ -1,10 +1,13 @@
 import type { Gap, MasteryMap, Role, Skill, SkillGraph } from "@/lib/types";
+import { buildMilestones, type Milestone } from "@/lib/planner/milestones";
 
 export type RoadmapPlan = {
   role: Role;
   readiness: number;
   gaps: Gap[];
   mastered: Gap[];
+  /** The same skills, layered by prerequisite depth. */
+  milestones: Milestone[];
 };
 
 export type PlanRoadmapInput = {
@@ -57,7 +60,9 @@ export function planRoadmap({
       reason: `${item.skill.name} has enough evidence for this role right now.`
     }));
 
-  return { role, readiness, gaps: topologicalGapOrder(gapCandidates, skillById), mastered };
+  const gaps = topologicalGapOrder(gapCandidates, skillById);
+
+  return { role, readiness, gaps, mastered, milestones: buildMilestones(gaps, mastered) };
 }
 
 export function prerequisitesSatisfied(

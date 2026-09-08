@@ -9,6 +9,15 @@ import { findViolations, type GroundingViolation } from "@/lib/llm/grounded-expl
  */
 export type MentorFacts = {
   roleTitle: string;
+  /**
+   * The profiling half of the learner, so the mentor answers this person rather
+   * than a generic one. Captured at onboarding and previously read by nothing.
+   */
+  objective: string;
+  experienceLevel: string;
+  interests: string[];
+  knownSkills: string[];
+  completedCourses: string[];
   readinessPercent: number;
   masteredSkills: string[];
   /** The next few gaps in planner order, each with what is blocking it. */
@@ -66,6 +75,10 @@ Answer in at most 60 words, plain prose, no markdown, no lists.
 
 Use ONLY the facts in the LEARNER STATE block. If the answer is not in there,
 reply with exactly: "${CANNOT_ANSWER}"
+
+The learner stated their own objective, experience, interests, known skills and
+past courses. Treat those as what they told you about themselves, not as proven
+mastery — only masteredSkills and the gap percentages are measured.
 
 Never state a URL, web address, price, rating, certificate, accreditation or job
 guarantee. Never promise a job or an outcome. The only numbers you may write are

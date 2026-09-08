@@ -898,6 +898,48 @@ knows where things stand without re-deriving it.
   fell through to the fallback. The turn logic is unit-tested and the wire shape
   is confirmed; an actual model-asked follow-up has not been seen.
 
+- 2026-09-08: **Audited the five brief requirements; three were hollow.**
+  **Projects did not exist.** 225 catalog rows were course/doc/lab/video and not
+  one was type `project`, even though `EVENT_WEIGHTS` weighs `project_reviewed`
+  above every other signal — the heaviest evidence in the product was
+  unreachable because nothing could produce it. `lib/data/projects.ts` adds nine
+  cross-domain builds (HELK, Metasploitable3, OWASP WrongSecrets, RealWorld,
+  Project-Based Learning, two Microsoft curricula, a pandas notebook set,
+  Kubernetes examples). Every URL was curl-verified 200 on the day; one
+  candidate returned 404 and was dropped rather than seeded.
+  That surfaced a **seeding bug**: `seed/graph/seed.ts` iterated the domain
+  bundles, so the projects landed in Mongo (234) and not in Neo4j (225) — a row
+  in one store and not the other is exactly the broken gate the admin route
+  refuses to create. The graph seed now walks `allResources`. Both stores hold
+  234, the nine are indexed in Qdrant, and `npm run graph:verify` still passes
+  5/5.
+  **Milestones were a word in the marketing copy.** The landing and evidence
+  pages said "milestone"; nothing in the model or the planner did.
+  `lib/planner/milestones.ts` layers the role's skills by prerequisite depth —
+  everything in milestone 1 can be started today, nothing in milestone 2 can
+  begin until it clears — so the grouping is a property of the graph rather than
+  a presentational chunking, and cannot drift from the order the planner
+  enforces. 11 tests, two of them over real seeded data (every skill covered
+  exactly once; no skill ever placed before one of its prerequisites).
+  `components/MilestoneTrack.tsx` puts it on the dashboard.
+  **The profiling engine captured and then discarded.** `interests`,
+  `learningHistory`, `preferredTechnologies`, `experienceLevel`,
+  `careerObjective`, `currentSkills` and `learningStyle` had *zero* readers
+  outside the onboarding schema, and the learner could never see or correct what
+  had been inferred about them. `components/ProfilePanel.tsx` on `/account`
+  shows and edits all of it through the same validated PUT, and the fields now
+  feed the mentor's fact pack — flagged in the prompt as what the learner said
+  about themselves, never as measured mastery, which only the gap percentages
+  are.
+  Onboarding also gained a "step 1 of 4", named examples, and a line saying what
+  comes next.
+  Verified: 200 unit tests, typecheck, lint, build, `graph:verify` 5/5, and a
+  15/15 live pass over all five requirements — profile visible, editable and
+  persisted; projects returned by semantic search; a prerequisite-ordered path
+  with 5 generated milestones and exactly one current; explanations and mentor
+  answering; dashboard showing readiness, skills, milestones and the next
+  action.
+
 - [x] Repo scaffolded; Neo4j, MongoDB, and Qdrant all connected
 - [x] Skill graph + prerequisite edges seeded in Neo4j — 9 domains, 19 roles,
       96 skills

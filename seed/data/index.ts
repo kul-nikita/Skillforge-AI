@@ -9,6 +9,7 @@ import { mobileDevelopment } from "@/lib/data/domains/mobile-development";
 import { productManagement } from "@/lib/data/domains/product-management";
 import { uxDesign } from "@/lib/data/domains/ux-design";
 import { webDevelopment } from "@/lib/data/domains/web-development";
+import { projectResources } from "@/lib/data/projects";
 
 export type { DomainBundle };
 export { defineDomain };
@@ -29,6 +30,11 @@ export const domains: DomainBundle[] = [
   itSupport
 ];
 
-export const allResources = domains.flatMap((bundle) => bundle.resources);
+/**
+ * Projects span domains (a hunting platform is cyber, a RealWorld build is web),
+ * so they are appended once rather than split across the bundles. Every catalog
+ * rule still applies to them — the tests run over `allResources`.
+ */
+export const allResources = [...domains.flatMap((bundle) => bundle.resources), ...projectResources];
 export const allSkills = domains.flatMap((bundle) => bundle.skills);
 export const allRoles = domains.flatMap((bundle) => bundle.roles);

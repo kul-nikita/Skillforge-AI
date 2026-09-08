@@ -63,6 +63,11 @@ export async function POST(request: Request) {
 
   const facts: MentorFacts = {
     roleTitle: state.role.title,
+    objective: state.profile?.careerObjective ?? "",
+    experienceLevel: state.profile?.experienceLevel ?? "beginner",
+    interests: state.profile?.interests ?? [],
+    knownSkills: state.profile?.currentSkills ?? [],
+    completedCourses: state.profile?.learningHistory ?? [],
     readinessPercent: Math.round(state.readiness * 100),
     // Names come from the graph; the model never gets to invent a skill.
     masteredSkills: masteredNames,

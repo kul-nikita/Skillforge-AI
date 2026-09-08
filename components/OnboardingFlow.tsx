@@ -13,6 +13,8 @@ type Intent = {
   preferences: { maxHoursPerStep: number; cost: string; format: string };
 };
 
+const EXAMPLE_LABELS = ["Career switch", "Going deeper", "From spreadsheets", "Already in IT"];
+
 const EXAMPLES = [
   "I'm a second-year student who knows some Python and networking. I want to be internship-ready as a junior SOC analyst in 12 weeks.",
   "I can give about 5 hours a week and prefer hands-on labs. I want to move into penetration testing over the next 6 months.",
@@ -211,7 +213,7 @@ export function OnboardingFlow({ roles }: { roles: Role[] }) {
               onClick={() => setGoal(example)}
               type="button"
             >
-              Example {index + 1}
+              {EXAMPLE_LABELS[index]}
             </button>
           ))}
         </div>

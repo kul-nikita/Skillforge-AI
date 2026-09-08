@@ -1,5 +1,5 @@
 import { closeNeo4jDriver, runQuery } from "@/lib/graph/neo4j";
-import { domains } from "@/seed/data";
+import { allResources, domains } from "@/seed/data";
 
 /**
  * Rebuilds the whole graph. Structure only — no learner state lives in Neo4j.
@@ -60,28 +60,35 @@ async function main() {
       roleCount += 1;
     }
 
-    for (const resource of bundle.resources) {
-      await runQuery("MERGE (res:Resource {id: $id})", { id: resource.id });
+  }
 
-      for (const skillId of resource.skillTags) {
-        await runQuery(
-          `MATCH (res:Resource {id: $resourceId}), (s:Skill {id: $skillId})
-           MERGE (res)-[:TEACHES]->(s)`,
-          { resourceId: resource.id, skillId }
-        );
-      }
+  /**
+   * Every resource, not just the ones hanging off a domain bundle. Projects are
+   * cross-domain and live in their own file, and iterating the bundles here
+   * silently left them out of Neo4j while Mongo had them — a row in one store
+   * and not the other means the gate can never return it.
+   */
+  for (const resource of allResources) {
+    await runQuery("MERGE (res:Resource {id: $id})", { id: resource.id });
 
-      // A resource's own prerequisites are graph edges too, so the candidate
-      // gate can be evaluated entirely in Cypher.
-      for (const skillId of resource.prerequisites) {
-        await runQuery(
-          `MATCH (res:Resource {id: $resourceId}), (s:Skill {id: $skillId})
-           MERGE (res)-[:REQUIRES_SKILL]->(s)`,
-          { resourceId: resource.id, skillId }
-        );
-      }
-      resourceCount += 1;
+    for (const skillId of resource.skillTags) {
+      await runQuery(
+        `MATCH (res:Resource {id: $resourceId}), (s:Skill {id: $skillId})
+         MERGE (res)-[:TEACHES]->(s)`,
+        { resourceId: resource.id, skillId }
+      );
     }
+
+    // A resource's own prerequisites are graph edges too, so the candidate
+    // gate can be evaluated entirely in Cypher.
+    for (const skillId of resource.prerequisites) {
+      await runQuery(
+        `MATCH (res:Resource {id: $resourceId}), (s:Skill {id: $skillId})
+         MERGE (res)-[:REQUIRES_SKILL]->(s)`,
+        { resourceId: resource.id, skillId }
+      );
+    }
+    resourceCount += 1;
   }
 
   console.log(

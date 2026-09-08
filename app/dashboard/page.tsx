@@ -23,6 +23,7 @@ import { isAdmin } from "@/lib/auth/admin";
 import { SiteHeader } from "@/components/SiteHeader";
 import { JourneyStrip } from "@/components/JourneyStrip";
 import { MentorPanel } from "@/components/MentorPanel";
+import { MilestoneTrack } from "@/components/MilestoneTrack";
 import { FirstRun } from "@/components/FirstRun";
 import { currentStage } from "@/lib/services/journey";
 import { predictTimeline } from "@/lib/prediction/timeline";
@@ -316,6 +317,10 @@ export default async function DashboardPage() {
 
         <section className="mx-auto grid max-w-7xl gap-6 px-6 pb-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(340px,1fr)]">
           <SkillHeatmap gaps={roadmap.gaps} mastered={roadmap.mastered} mastery={mastery} />
+          <MilestoneTrack milestones={roadmap.milestones} />
+        </section>
+
+        <section className="mx-auto max-w-7xl px-6 pb-6">
           <MentorPanel />
         </section>
 
