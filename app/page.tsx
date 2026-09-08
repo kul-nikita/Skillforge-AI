@@ -123,9 +123,6 @@ export default async function LandingPage() {
         <div className="absolute inset-0 skillforge-grid opacity-40" />
 
         {/* Glow orbs */}
-        <div className="absolute left-[20%] top-[18%] h-72 w-72 rounded-full bg-cyan-500/10 blur-[110px]" />
-        <div className="absolute right-[15%] top-[25%] h-96 w-96 rounded-full bg-violet-600/15 blur-[130px]" />
-        <div className="absolute bottom-[-100px] left-[45%] h-80 w-80 rounded-full bg-blue-600/10 blur-[120px]" />
 
         {/* Decorative neural lines */}
         <div className="pointer-events-none absolute left-[28%] top-[16%] h-[400px] w-[400px] opacity-70">
@@ -171,7 +168,7 @@ export default async function LandingPage() {
               <div className="mt-9 flex flex-wrap gap-3">
                 <Link
                   href="/onboarding"
-                  className="group inline-flex h-13 items-center gap-3 rounded-xl bg-gradient-to-r from-violet-600 via-blue-500 to-cyan-400 px-6 py-3.5 text-sm font-bold shadow-[0_0_35px_rgba(56,189,248,0.2)] transition hover:scale-[1.02]"
+                  className="group inline-flex h-12 items-center gap-3 rounded-md bg-ink px-6 text-sm font-semibold text-canvas transition-colors hover:bg-white"
                 >
                   <Sparkles size={18} />
                   Build my learning path
@@ -212,21 +209,19 @@ export default async function LandingPage() {
 
             {/* RIGHT - ONE INTEGRATED AI CARD */}
             <div className="relative z-10 flex justify-center lg:justify-end">
-              <div className="skillforge-path-panel relative w-full max-w-[560px] overflow-hidden rounded-[28px] border border-cyan-300/20 bg-[#0b1026]/90 p-5 shadow-[0_30px_100px_rgba(0,0,0,0.5)] backdrop-blur-xl md:p-6">
+              <div className="skillforge-path-panel relative w-full max-w-[560px] overflow-hidden rounded-lg border border-border bg-surface p-5 md:p-6">
                 {/* Panel glow */}
-                <div className="pointer-events-none absolute -right-32 -top-32 h-72 w-72 rounded-full bg-violet-600/20 blur-[100px]" />
-                <div className="pointer-events-none absolute -bottom-32 -left-32 h-72 w-72 rounded-full bg-cyan-500/10 blur-[100px]" />
 
                 <div className="relative">
                   {/* Header */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-cyan-400 shadow-lg">
+                      <div className="grid h-11 w-11 place-items-center rounded-md border border-border bg-surface-sunken">
                         <BrainCircuit size={23} />
                       </div>
 
                       <div>
-                        <p className="text-sm font-bold uppercase tracking-wide">
+                        <p className="text-sm font-semibold">
                           Your AI Learning Path
                         </p>
                         <p className="text-xs text-slate-400">
@@ -248,7 +243,7 @@ export default async function LandingPage() {
                       </div>
 
                       <div>
-                        <p className="text-[10px] uppercase tracking-widest text-slate-500">
+                        <p className="text-[11px] text-slate-500">
                           Current Goal
                         </p>
                         <p className="mt-1 text-sm font-semibold">
@@ -260,7 +255,7 @@ export default async function LandingPage() {
 
                   {/* Path */}
                   <div className="relative mt-7">
-                    <div className="absolute left-[16px] top-5 h-[205px] w-px bg-gradient-to-b from-cyan-400 via-violet-500 to-transparent" />
+                    <div className="absolute left-[16px] top-5 h-[205px] w-px bg-border" />
 
                     {heroSteps.map((step) => (
                       <div
@@ -270,7 +265,7 @@ export default async function LandingPage() {
                         <div
                           className={`relative z-10 grid h-8 w-8 shrink-0 place-items-center rounded-full border text-xs font-bold ${
                             step.active
-                              ? "border-cyan-300 bg-cyan-400/10 text-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.35)]"
+                              ? "border-cyan-300/60 bg-cyan-400/10 text-cyan-300"
                               : "border-violet-400/60 bg-[#0b1026] text-white"
                           }`}
                         >
@@ -290,9 +285,9 @@ export default async function LandingPage() {
                   </div>
 
                   {/* Confidence - INSIDE panel */}
-                  <div className="mt-7 flex items-center justify-between rounded-2xl border border-violet-400/10 bg-gradient-to-r from-violet-500/[0.08] to-cyan-400/[0.05] px-4 py-4">
+                  <div className="mt-7 flex items-center justify-between rounded-md border border-border bg-surface-sunken px-4 py-4">
                     <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-violet-300">
+                      <p className="text-[11px] font-medium text-slate-400">
                         AI Confidence
                       </p>
                       <p className="mt-1 text-lg font-bold">94% match</p>
@@ -302,7 +297,7 @@ export default async function LandingPage() {
                       {[15, 23, 18, 30, 25, 34, 28, 38].map((height, i) => (
                         <span
                           key={i}
-                          className="w-1.5 rounded-t bg-gradient-to-t from-violet-500 to-cyan-300"
+                          className="w-1.5 rounded-t bg-cyan-400/70"
                           style={{ height }}
                         />
                       ))}
@@ -314,7 +309,7 @@ export default async function LandingPage() {
           </div>
 
           {/* STATS */}
-          <div className="relative z-10 mt-16 overflow-hidden rounded-2xl border border-cyan-300/20 bg-[#0b1026]/70 backdrop-blur-xl">
+          <div className="relative z-10 mt-16 overflow-hidden rounded-lg border border-border bg-surface">
             <div className="grid grid-cols-2 md:grid-cols-5">
               {stats.map((stat, index) => {
                 const Icon = stat.icon;
@@ -356,9 +351,7 @@ export default async function LandingPage() {
 
         <div className="relative mx-auto max-w-7xl px-6">
           <div className="max-w-3xl">
-            <p className="mb-4 text-xs font-bold uppercase tracking-[0.25em] text-cyan-300">
-              THE DIFFERENCE
-            </p>
+            <p className="mb-3 text-sm font-medium text-muted">The difference</p>
 
             <h2 className="text-4xl font-bold tracking-tight md:text-5xl">
               More than a course
@@ -383,7 +376,6 @@ export default async function LandingPage() {
                   key={feature.number}
                   className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.025] p-7 transition duration-300 hover:-translate-y-1 hover:border-cyan-400/30 hover:bg-white/[0.045]"
                 >
-                  <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-violet-500/5 blur-[70px] transition group-hover:bg-violet-500/10" />
 
                   <div className="relative flex gap-5">
                     <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-violet-400/20 bg-violet-500/10 text-violet-300">
@@ -419,9 +411,7 @@ export default async function LandingPage() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
             <div>
-              <p className="mb-4 text-xs font-bold uppercase tracking-[0.25em] text-violet-300">
-                YOUR JOURNEY
-              </p>
+              <p className="mb-3 text-sm font-medium text-muted">Your journey</p>
 
               <h2 className="text-4xl font-bold md:text-5xl">
                 How SkillForge works
@@ -495,9 +485,7 @@ export default async function LandingPage() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="flex items-end justify-between gap-6">
             <div>
-              <p className="mb-4 text-xs font-bold uppercase tracking-[0.25em] text-cyan-300">
-                EXPLORE
-              </p>
+              <p className="mb-3 text-sm font-medium text-muted">Explore</p>
 
               <h2 className="text-4xl font-bold md:text-5xl">
                 Explore career tracks
@@ -571,7 +559,7 @@ export default async function LandingPage() {
             {[1, 2, 3, 4, 5].map((member) => (
               <div
                 key={member}
-                className="grid h-14 w-14 place-items-center rounded-full border-2 border-[#050816] bg-gradient-to-br from-violet-500/30 to-cyan-400/20"
+                className="grid h-14 w-14 place-items-center rounded-full border-2 border-canvas bg-surface"
               >
                 <CircleDot size={21} className="text-slate-300" />
               </div>

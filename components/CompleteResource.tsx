@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Award, CheckCircle2, Loader2, MessageSquare } from "lucide-react";
 import { InterviewFlow } from "@/components/InterviewFlow";
+import { ProgressNote } from "@/components/ProgressNote";
 
 type Question = {
   id: string;
@@ -159,7 +160,9 @@ export function CompleteResource({
             Nothing was saved: analysis of your learning data needs consent, which you can give in
             account settings.
           </p>
-        ) : null}
+        ) : (
+          <ProgressNote />
+        )}
       </div>
     );
   }

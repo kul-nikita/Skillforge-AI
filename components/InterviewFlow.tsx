@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { MessageSquare, Check, X, Loader2, Award } from "lucide-react";
+import { ProgressNote } from "@/components/ProgressNote";
 
 type Question = {
   id: string;
@@ -363,6 +364,8 @@ export function InterviewFlow({
               </div>
             ))}
           </div>
+
+          {evidenceId && <ProgressNote />}
 
           {/* Actions */}
           <div className="mt-6 flex gap-3">

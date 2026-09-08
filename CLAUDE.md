@@ -795,6 +795,55 @@ knows where things stand without re-deriving it.
   semantic search returning 10 hits with the prerequisite gate still naming what
   blocks each one.
 
+- 2026-09-08: **First-run journey, three grounded AI surfaces, and a visual pass.**
+  Walking the app as a brand-new account found the worst bug in the product so
+  far: with no profile, `app/dashboard/page.tsx` fell back to `roles[0]` and
+  rendered the alphabetically-first role — *AI Application Developer* — as the
+  learner's own target, complete with readiness score, roadmap queue and scored
+  recommendations. `/gap-analyzer` and `/match-score` already redirected to
+  onboarding in that state, so the app knew a profile was required; the
+  dashboard just invented one. It now renders `components/FirstRun.tsx`.
+  **`lib/services/journey.ts`** derives the learner's stage (goal -> level ->
+  learn -> prove) from what they have actually done, never stored, for the same
+  reason mastery is derived from the event log. `components/JourneyStrip.tsx`
+  puts "step 2 of 4, and here is why" on every signed-in page. Navigation is two
+  groups instead of six flat links, and the two labels that named the
+  implementation are gone: "JD Gap" -> *Job fit*, "Match Score" -> *Am I ready?*
+  (routes unchanged). A bell icon that did nothing was deleted.
+  **Three AI surfaces, all on the existing boundary.** `findGroundingViolations`
+  was split so its core (`findViolations`) is shared rather than copied: the
+  coach (`/api/coach`, what to do next and why), the mentor (`/api/mentor`,
+  questions about your own roadmap) and progress narration after a graded
+  completion all build their fact pack **server-side** from Mongo and Neo4j, then
+  have the reply checked against it. `lib/services/learner-state.ts` is the one
+  loader they share, so the dashboard, coach and mentor cannot drift into three
+  opinions about the next step. The mentor's pack is deliberately small — every
+  extra number in it is another number the guard must permit.
+  Two real bugs found while driving it. The mentor answered every question with
+  "that isn't in your data" when the model was simply unreachable, which is a lie
+  about the learner's own question — outage and refusal are now different
+  sentences. And both LLM wrappers swallowed their exception, so a 429 looked
+  identical to a refusal; they log the cause now.
+  **The generated-dashboard look is mostly a token problem.** `lib/ui.ts`
+  primary button was a violet-to-cyan gradient with a glow, used everywhere;
+  it is a solid high-contrast button now, and the accent is spent on state
+  rather than decoration. The landing page lost 8 gradients, 6 blur orbs and 5
+  all-caps letterspaced eyebrows; a rainbow progress bar whose colours implied
+  thresholds that do not exist is a single accent fill.
+  Verified: 181 unit tests (29 new: journey stages, coach and mentor grounding),
+  typecheck, lint, production build, and two live walks — 11/11 on the new-user
+  journey (no fabricated role, strip advancing 1 -> 2 -> 3, nav renamed) and
+  12/12 on the visual pass with every route still rendering.
+  **Not proven live: the mentor's model path.** The Gemini free-tier quota was
+  exhausted by this session, so every AI surface fell back during the final run.
+  That did demonstrate the degradation is real — each one still says something
+  true and useful without the model, and the coach's deterministic note names a
+  real resource and duration. The coach's LLM path was seen working earlier the
+  same day; the mentor's has not been.
+  Caching was built and then reverted at the user's request; the perceived-speed
+  work is still open (a dashboard render makes ~6 Neo4j round trips, two of them
+  redundant).
+
 - [x] Repo scaffolded; Neo4j, MongoDB, and Qdrant all connected
 - [x] Skill graph + prerequisite edges seeded in Neo4j — 9 domains, 19 roles,
       96 skills

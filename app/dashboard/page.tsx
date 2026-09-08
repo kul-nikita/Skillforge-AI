@@ -8,7 +8,6 @@ import {
   LockKeyhole,
   Route,
   ShieldCheck,
-  Sparkles
 } from "lucide-react";
 import { ScoreBreakdown } from "@/components/ScoreBreakdown";
 import { ExplainButton } from "@/components/ExplainButton";
@@ -22,6 +21,10 @@ import { DEFAULT_PREFERENCES, DEFAULT_WEEKLY_HOURS } from "@/lib/constants";
 import { requireUserOrRedirect } from "@/lib/auth/session";
 import { isAdmin } from "@/lib/auth/admin";
 import { SiteHeader } from "@/components/SiteHeader";
+import { JourneyStrip } from "@/components/JourneyStrip";
+import { MentorPanel } from "@/components/MentorPanel";
+import { FirstRun } from "@/components/FirstRun";
+import { currentStage } from "@/lib/services/journey";
 import { predictTimeline } from "@/lib/prediction/timeline";
 
 export const dynamic = "force-dynamic";
@@ -40,17 +43,21 @@ export default async function DashboardPage() {
     getSkillGraph()
   ]);
 
-  const targetRoleId = profile?.targetRoleId ?? roles[0]?.id;
+  const stage = currentStage({ profile, events, evidence });
+  const targetRoleId = profile?.targetRoleId;
 
+  // Without a goal there is no roadmap to show. Showing roles[0]'s plan instead
+  // — readiness, gaps, recommendations and all — told every new learner they
+  // were partway through a career they had never chosen.
   if (!targetRoleId) {
     return (
-      <main className="mx-auto max-w-3xl px-6 py-16">
-        <h1 className="text-2xl font-semibold">No roles are seeded yet</h1>
-        <p className="mt-3 text-muted">
-          Run <code className="rounded bg-canvas px-1.5 py-0.5">npm run db:seed:all</code> to load the
-          skill graph and catalog.
-        </p>
-      </main>
+      <>
+        <SiteHeader current="/dashboard" showAdmin={isAdmin(user)} user={user} />
+        <JourneyStrip stage={stage} />
+        <main className="min-h-screen bg-canvas text-ink" id="main">
+          <FirstRun hasRoles={roles.length > 0} />
+        </main>
+      </>
     );
   }
 
@@ -86,6 +93,7 @@ export default async function DashboardPage() {
   return (
     <>
       <SiteHeader current="/dashboard" showAdmin={isAdmin(user)} user={user} />
+      <JourneyStrip stage={stage} />
       <main
         className="min-h-screen bg-[linear-gradient(180deg,#050816_0%,#07101f_42%,#050816_100%)] text-ink"
         id="main"
@@ -93,11 +101,8 @@ export default async function DashboardPage() {
         <section className="mx-auto max-w-7xl px-6 pt-8">
           <div className="flex flex-col gap-6 border-b border-white/10 pb-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-md border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-cyan-200">
-                <Sparkles aria-hidden="true" size={13} />
-                {domainName}
-              </div>
-              <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight text-white md:text-4xl">
+              <p className="text-sm font-medium text-muted">{domainName}</p>
+              <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-white md:text-4xl">
                 {roadmap.role.title}
               </h1>
               <p className="mt-2 text-sm leading-6 text-muted">
@@ -111,7 +116,7 @@ export default async function DashboardPage() {
 
             <div className="flex flex-wrap items-center gap-3">
               <Link
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-cyan-700 px-4 text-sm font-semibold text-white transition hover:bg-cyan-800"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-ink px-4 text-sm font-semibold text-canvas transition hover:bg-white"
                 href="/diagnostic"
               >
                 <Compass aria-hidden="true" size={16} />
@@ -156,7 +161,7 @@ export default async function DashboardPage() {
               </div>
               <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-cyan-300 via-emerald-300 to-amber-200"
+                  className="h-full rounded-full bg-cyan-300"
                   style={{ width: `${readinessPercent}%` }}
                 />
               </div>
@@ -309,8 +314,9 @@ export default async function DashboardPage() {
           </article>
         </section>
 
-        <section className="mx-auto max-w-7xl px-6 pb-6">
+        <section className="mx-auto grid max-w-7xl gap-6 px-6 pb-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(340px,1fr)]">
           <SkillHeatmap gaps={roadmap.gaps} mastered={roadmap.mastered} mastery={mastery} />
+          <MentorPanel />
         </section>
 
         {timelineData && role && (

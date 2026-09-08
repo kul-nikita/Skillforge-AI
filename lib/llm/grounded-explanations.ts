@@ -56,11 +56,17 @@ const BANNED_CLAIMS = /\b(?:certificat\w*|accredit\w*|guarantee\w*|usd|eur|gbp)\
 export type GroundingViolation = { kind: "url" | "claim" | "number"; detail: string };
 
 /**
- * Rejects output that asserts anything the facts don't support. This is the
- * check that makes "the LLM never invents facts" enforceable rather than
- * aspirational.
+ * The guard itself, over any closed fact set: no URLs, no price or credential
+ * claims, and no number the caller did not supply. Shared by every feature that
+ * lets a model write prose about a learner's real data, so there is one
+ * definition of "grounded" rather than one per feature.
  */
-export function findGroundingViolations(text: string, facts: GroundedFacts): GroundingViolation[] {
+export function findViolations(
+  text: string,
+  permitted: Set<string>,
+  /** Words from BANNED_CLAIMS that these facts genuinely support, e.g. a certificate artifact. */
+  allowedClaims: string[] = []
+): GroundingViolation[] {
   const violations: GroundingViolation[] = [];
 
   const url = text.match(URLISH);
@@ -69,12 +75,10 @@ export function findGroundingViolations(text: string, facts: GroundedFacts): Gro
   }
 
   const claim = text.match(BANNED_CLAIMS);
-  // "certificate" is only allowed if the artifact really is one.
-  if (claim && !(facts.resource.evidenceType ?? "").toLowerCase().includes(claim[0].toLowerCase())) {
+  if (claim && !allowedClaims.some((allowed) => allowed.toLowerCase().includes(claim[0].toLowerCase()))) {
     violations.push({ kind: "claim", detail: claim[0] });
   }
 
-  const permitted = allowedNumbers(facts);
   for (const match of text.matchAll(/\d+(?:\.\d+)?/g)) {
     if (!permitted.has(match[0])) {
       violations.push({ kind: "number", detail: match[0] });
@@ -82,6 +86,16 @@ export function findGroundingViolations(text: string, facts: GroundedFacts): Gro
   }
 
   return violations;
+}
+
+/**
+ * Rejects output that asserts anything the facts don't support. This is the
+ * check that makes "the LLM never invents facts" enforceable rather than
+ * aspirational.
+ */
+export function findGroundingViolations(text: string, facts: GroundedFacts): GroundingViolation[] {
+  // "certificate" is only allowed if the artifact really is one.
+  return findViolations(text, allowedNumbers(facts), [facts.resource.evidenceType ?? ""]);
 }
 
 export async function generateGroundedExplanation(

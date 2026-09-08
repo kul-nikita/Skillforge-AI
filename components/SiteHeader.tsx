@@ -1,15 +1,24 @@
 import Link from "next/link";
-import { Bell } from "lucide-react";
 import { SignOutButton } from "@/components/SignOutButton";
 import type { User } from "@/lib/db/users";
 
-const NAV = [
-  { href: "/dashboard", label: "Dashboard" },
+/**
+ * Two groups, because six flat links gave a newcomer no idea which mattered
+ * first. "Your path" is the loop the product promises; "Tools" is everything
+ * you reach for once you are in it. Labels say what the learner gets — "JD Gap"
+ * and "Match Score" named the implementation, not the outcome. Routes are
+ * unchanged so nothing that links here breaks.
+ */
+const PATH_NAV = [
+  { href: "/dashboard", label: "Your path" },
   { href: "/diagnostic", label: "Diagnostic" },
-  { href: "/evidence", label: "Evidence" },
-  { href: "/graph", label: "Skill Graph" },
-  { href: "/gap-analyzer", label: "JD Gap" },
-  { href: "/match-score", label: "Match Score" },
+  { href: "/evidence", label: "Evidence" }
+];
+
+const TOOL_NAV = [
+  { href: "/graph", label: "Skill map" },
+  { href: "/gap-analyzer", label: "Job fit" },
+  { href: "/match-score", label: "Am I ready?" }
 ];
 
 export function SiteHeader({
@@ -21,9 +30,8 @@ export function SiteHeader({
   current?: string;
   showAdmin?: boolean;
 }) {
-  const links = showAdmin
-    ? [...NAV, { href: "/admin", label: "Catalog" }]
-    : NAV;
+  const tools = showAdmin ? [...TOOL_NAV, { href: "/admin", label: "Catalog" }] : TOOL_NAV;
+  const links = [...PATH_NAV, ...tools];
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[#050816]/75 backdrop-blur-xl">
@@ -61,39 +69,26 @@ export function SiteHeader({
         )}
 
         {user && (
-          <ul className="hidden items-center gap-1 md:flex">
-            {links.map((link) => {
-              const active = current === link.href;
+          <ul className="hidden items-center gap-0.5 md:flex">
+            {PATH_NAV.map((link) => (
+              <li key={link.href}>
+                <NavLink active={current === link.href} href={link.href} label={link.label} />
+              </li>
+            ))}
 
-              return (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    aria-current={active ? "page" : undefined}
-                    className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                      active
-                        ? "bg-violet-500/15 text-violet-300"
-                        : "text-slate-400 hover:bg-white/5 hover:text-white"
-                    }`}
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              );
-            })}
+            <li aria-hidden="true" className="mx-2 h-4 w-px bg-border" />
+
+            {tools.map((link) => (
+              <li key={link.href}>
+                <NavLink active={current === link.href} href={link.href} label={link.label} />
+              </li>
+            ))}
           </ul>
         )}
 
         <div className="flex items-center gap-3">
           {user ? (
             <>
-              <button
-                type="button"
-                className="hidden rounded-lg p-2 text-slate-400 transition hover:bg-white/5 hover:text-white sm:block"
-              >
-                <Bell size={18} />
-              </button>
-
               <Link
                 href="/account"
                 className="hidden max-w-[180px] truncate rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-white/5 sm:block"
@@ -114,7 +109,7 @@ export function SiteHeader({
 
               <Link
                 href="/onboarding"
-                className="rounded-xl bg-gradient-to-r from-violet-600 to-cyan-500 px-5 py-2.5 text-sm font-bold text-white shadow-[0_0_25px_rgba(99,102,241,0.2)] transition hover:scale-[1.02]"
+                className="rounded-md bg-ink px-4 py-2 text-sm font-semibold text-canvas transition-colors hover:bg-white"
               >
                 Get started
               </Link>
@@ -144,5 +139,19 @@ export function SiteHeader({
         </div>
       )}
     </header>
+  );
+}
+
+function NavLink({ active, href, label }: { active: boolean; href: string; label: string }) {
+  return (
+    <Link
+      aria-current={active ? "page" : undefined}
+      className={`rounded-md px-3 py-2 text-sm transition-colors ${
+        active ? "bg-white/10 font-medium text-ink" : "text-muted hover:bg-white/5 hover:text-ink"
+      }`}
+      href={href}
+    >
+      {label}
+    </Link>
   );
 }
