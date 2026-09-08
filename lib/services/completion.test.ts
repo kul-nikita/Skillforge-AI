@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CHECK_QUESTIONS_PER_SKILL,
+  answeredQuestionIds,
   checkQuestionsForResource,
   completionEvents,
   completionEvidence,
@@ -104,6 +105,30 @@ describe("completion post-check", () => {
     expect(evidence.artifactUrl).toBeNull();
     expect(evidence.evidenceType).toBe(withEvidence.evidenceType);
     expect(evidence.validatedCapabilities.length).toBeGreaterThan(0);
+  });
+
+  // The issued-question token carries no server state, so the log is what stops
+  // one graded sitting being submitted repeatedly to mint evidence and inflate
+  // mastery. If this stops finding the ids, /api/complete becomes replayable.
+  it("reports the question ids a completion was graded on, so a replay can be refused", () => {
+    const answers = answersFor(resource, true);
+    const { bySkill } = gradeCompletion(resource, answers);
+    const events = completionEvents("learner-1", resource, bySkill, "2026-09-09");
+
+    const graded = answeredQuestionIds(events);
+
+    expect(graded.length).toBe(answers.length);
+    for (const answer of answers) {
+      expect(graded).toContain(answer.questionId);
+    }
+  });
+
+  it("ignores events that carry no question ids", () => {
+    expect(
+      answeredQuestionIds([
+        { learnerId: "l", verb: "quiz_completed", objectType: "resource", objectId: "r", skillId: "s", score: 1, timestamp: "t" }
+      ])
+    ).toEqual([]);
   });
 
   // Guards the assumption that a completion is checkable at all: a resource

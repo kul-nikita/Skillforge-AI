@@ -11,7 +11,7 @@ import type { ZodType, ZodTypeDef } from "zod";
  */
 
 const BASE = "https://generativelanguage.googleapis.com/v1beta/models";
-export const GEMINI_MODEL = "gemini-2.5-flash";
+export const GEMINI_MODEL = "gemini-flash-latest";
 
 const RETRY_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 const DEFAULT_TIMEOUT_MS = 30_000;
