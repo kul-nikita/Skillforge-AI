@@ -5,12 +5,14 @@ import { addEvidence, appendEvents, getMastery, listEvents } from "@/lib/db/lear
 import { findResourcesByIds } from "@/lib/db/resources";
 import { getSkillsByIds } from "@/lib/graph/queries";
 import {
+  answeredQuestionIds,
   checkQuestionsForResource,
   completionEvents,
   completionEvidence,
   gradeCompletion
 } from "@/lib/services/completion";
 import { issueToken, tokenMatches } from "@/lib/crypto/signing";
+import type { Evidence } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -36,10 +38,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: `Unknown resource: ${resourceId}` }, { status: 404 });
   }
 
-  const alreadyAsked = (await listEvents(user.id)).flatMap((event) => {
-    const ids = event.metadata?.questionIds;
-    return Array.isArray(ids) ? ids.map(String) : [];
-  });
+  const alreadyAsked = answeredQuestionIds(await listEvents(user.id));
 
   const questions = checkQuestionsForResource(resource, alreadyAsked).map(
     // Never ship correctIndex to the client — it would leak the answer.
@@ -107,6 +106,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `Unknown resource: ${resourceId}` }, { status: 404 });
   }
 
+  // The token proves *which* questions were issued, not how many times they may
+  // be graded — it carries no server state, so on its own it can be replayed to
+  // mint evidence and inflate mastery from one sitting. The log is that state.
+  const priorEvents = await listEvents(user.id);
+  const alreadyGraded = new Set(answeredQuestionIds(priorEvents));
+
+  if (submittedIds.some((id) => alreadyGraded.has(id))) {
+    return NextResponse.json(
+      { error: "You have already been graded on these questions. Reload the post-check for a fresh set." },
+      { status: 409 }
+    );
+  }
+
   const { bySkill, overall } = gradeCompletion(resource, answers);
   const timestamp = new Date().toISOString();
   const events = completionEvents(user.id, resource, bySkill, timestamp);
@@ -125,12 +137,14 @@ export async function POST(request: Request) {
 
   // Product rule 5: nothing is stored for a learner who has not consented.
   const persisted = Boolean(user.consentGiven);
-  let evidenceId: string | null = null;
+  // The signed record as stored, so a caller can build a working /verify link.
+  // Without consent nothing is minted, and the unsigned preview says so.
+  let issued: Evidence | null = null;
 
   if (persisted) {
     await appendEvents(events);
     if (evidence) {
-      evidenceId = (await addEvidence(evidence)).id;
+      issued = await addEvidence(evidence);
     }
   }
 
@@ -138,7 +152,7 @@ export async function POST(request: Request) {
     persisted,
     score: overall,
     bySkill,
-    evidence: evidence ? { ...evidence, id: evidenceId } : null,
+    evidence: issued ?? evidence,
     // Recomputed from the log, so the client sees exactly what was stored.
     mastery: persisted ? await getMastery(user.id) : {}
   });

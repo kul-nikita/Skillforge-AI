@@ -43,6 +43,18 @@ export function checkQuestionsForResource(
   });
 }
 
+/**
+ * Every question id the learner has already been graded on, read from the
+ * append-only log. Excluding these keeps a retry from re-serving a question,
+ * and refusing them on submit keeps one issued check from being graded twice.
+ */
+export function answeredQuestionIds(events: LearningEvent[]): string[] {
+  return events.flatMap((event) => {
+    const ids = event.metadata?.questionIds;
+    return Array.isArray(ids) ? ids.map(String) : [];
+  });
+}
+
 export type SkillResult = {
   skillId: string;
   correct: number;
