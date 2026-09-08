@@ -262,28 +262,6 @@ select {
   font-weight: 700;
 }
 
-.logo-mark {
-  display: grid;
-  place-items: center;
-
-  width: 31px;
-  height: 31px;
-
-  border-radius: 9px;
-
-  background:
-    linear-gradient(
-      135deg,
-      #8b5cf6,
-      #22d3ee
-    );
-
-  color: white;
-
-  box-shadow:
-    0 0 20px rgba(139, 92, 246, 0.35);
-}
-
 .back-home {
   display: flex;
   align-items: center;

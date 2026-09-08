@@ -63,9 +63,6 @@ export function AuthLayout({
       {/* Top bar */}
       <header className="auth-topbar">
         <Link href="/" className="auth-logo">
-          <span className="logo-mark">
-            <Sparkles size={17} />
-          </span>
           <span>SkillForge</span>
         </Link>
 

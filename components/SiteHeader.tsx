@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, ChevronDown, Sparkles } from "lucide-react";
+import { Bell } from "lucide-react";
 import { SignOutButton } from "@/components/SignOutButton";
 import type { User } from "@/lib/db/users";
 
@@ -30,15 +30,9 @@ export function SiteHeader({
       <nav className="mx-auto flex h-[68px] max-w-7xl items-center justify-between px-6">
         <Link
           href={user ? "/dashboard" : "/"}
-          className="group flex items-center gap-3"
+          className="text-base font-bold tracking-tight text-white"
         >
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.18)]">
-            <Sparkles size={18} className="text-white" />
-          </span>
-
-          <span className="text-base font-bold tracking-tight text-white">
-            SkillForge
-          </span>
+          SkillForge
         </Link>
 
         {!user && (
