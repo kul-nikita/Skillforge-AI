@@ -19,7 +19,6 @@ export function ManualSetup({ roles, onBack }: { roles: Role[]; onBack: () => vo
   const [weeklyHours, setWeeklyHours] = useState(8);
   const [timelineWeeks, setTimelineWeeks] = useState(12);
   const [cost, setCost] = useState<"free" | "any">("free");
-  const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,7 +45,7 @@ export function ManualSetup({ roles, onBack }: { roles: Role[]; onBack: () => vo
           timelineWeeks,
           weeklyHours,
           preferences: { maxHoursPerStep: 3, cost, format: "any" },
-          consentGiven: consent
+          consentGiven: true
         })
       });
 
@@ -131,19 +130,6 @@ export function ManualSetup({ roles, onBack }: { roles: Role[]; onBack: () => vo
           <option value="any">Free or paid</option>
         </select>
       </div>
-
-      <label className="flex items-start gap-2 text-sm text-muted">
-        <input
-          checked={consent}
-          className="mt-0.5"
-          onChange={(event) => setConsent(event.target.checked)}
-          type="checkbox"
-        />
-        <span>
-          Analyse my diagnostic answers and progress to build my roadmap. You can export or delete
-          everything later.
-        </span>
-      </label>
 
       {error && (
         <p className="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300" role="alert">

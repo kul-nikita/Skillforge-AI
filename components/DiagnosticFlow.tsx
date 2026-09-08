@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, CalendarClock, CheckCircle2, Loader2, Route, ShieldCheck } from "lucide-react";
 import { CompleteResource } from "@/components/CompleteResource";
 import { ScoreBreakdown } from "@/components/ScoreBreakdown";
-import type { Domain, Role, ScoreBreakdown as ScoreBreakdownType } from "@/lib/types";
+import type { ScoreBreakdown as ScoreBreakdownType } from "@/lib/types";
 
 type Question = {
   id: string;
@@ -47,21 +47,21 @@ type WeeklyPlan = {
 
 // The client never learns the right answer, so it sends the option index and
 // the server decides correctness.
-const PREFERENCES = { maxHoursPerStep: 2, cost: "free", format: "lab" } as const;
-const WEEKLY_HOURS = 8;
 
 export function DiagnosticFlow({
-  roles,
-  domains,
-  defaultRoleId,
+  targetRoleId,
+  roleTitle,
+  weeklyHours,
   canPersist
 }: {
-  roles: Role[];
-  domains: Domain[];
-  defaultRoleId: string | null;
+  targetRoleId: string;
+  roleTitle: string;
+  weeklyHours: number;
   canPersist: boolean;
 }) {
-  const [roleId, setRoleId] = useState<string | null>(null);
+  // The role was chosen at onboarding. Asking again made that choice a
+  // suggestion and threw the answer away; the diagnostic just starts.
+  const roleId = targetRoleId;
   const [question, setQuestion] = useState<Question | null>(null);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [progress, setProgress] = useState({ answered: 0, max: 15 });
@@ -94,8 +94,6 @@ export function DiagnosticFlow({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           targetRoleId: nextRoleId,
-          weeklyHours: WEEKLY_HOURS,
-          preferences: PREFERENCES,
           mastery: data.mastery
         })
       });
@@ -111,12 +109,14 @@ export function DiagnosticFlow({
     }
   }
 
-  function start(nextRoleId: string) {
-    setRoleId(nextRoleId);
-    setAnswers([]);
-    setResult(null);
-    void advance(nextRoleId, []);
-  }
+  // Ref guard rather than a started flag: an effect that sets state it also
+  // depends on re-runs, and React invokes effects twice in development.
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    void advance(roleId, []);
+  }, []);
 
   function answer(selectedIndex: number) {
     if (!question || !roleId) return;
@@ -126,11 +126,11 @@ export function DiagnosticFlow({
   }
 
   function restart() {
-    setRoleId(null);
     setQuestion(null);
     setAnswers([]);
     setResult(null);
     setError(null);
+    void advance(roleId, []);
   }
 
   return (
@@ -143,8 +143,16 @@ export function DiagnosticFlow({
           </Link>
           <h1 className="mt-4 text-3xl font-semibold text-ink">Adaptive diagnostic</h1>
           <p className="mt-2 max-w-2xl text-base leading-7 text-muted">
-            Answer up to 15 questions. Each skill starts at intermediate and branches harder or
-            easier based on your answer, so the estimate lands faster than a fixed quiz.
+            Working out where you stand for <span className="font-semibold text-ink">{roleTitle}</span>.
+            Each skill starts at intermediate and branches harder or easier from your answer, so the
+            estimate lands in about 15 questions rather than a fixed quiz.
+          </p>
+          <p className="mt-3 text-sm text-muted">
+            {canPersist ? "Your results are saved to your profile." : "Results are shown but not saved."}
+            <span className="px-2 text-slate-600">/</span>
+            <Link className="text-teal hover:underline" href="/onboarding">
+              Change target role
+            </Link>
           </p>
         </div>
       </section>
@@ -155,8 +163,6 @@ export function DiagnosticFlow({
             {error}
           </p>
         )}
-
-        {!roleId && <RolePicker defaultRoleId={defaultRoleId} domains={domains} onPick={start} roles={roles} />}
 
         {roleId && question && (
           // key remounts the card per question so the previous pick never carries over.
@@ -171,15 +177,29 @@ export function DiagnosticFlow({
         )}
 
         {result && roleId && (
-          <Results mastery={mastery} onRestart={restart} result={result} roleId={roleId} />
+          <Results
+            mastery={mastery}
+            onRestart={restart}
+            result={result}
+            roleId={roleId}
+            weeklyHours={weeklyHours}
+          />
         )}
       </div>
     </main>
   );
 }
 
-function WeekPlanner({ mastery, roleId }: { mastery: Record<string, number>; roleId: string }) {
-  const [hours, setHours] = useState(8);
+function WeekPlanner({
+  mastery,
+  roleId,
+  weeklyHours
+}: {
+  mastery: Record<string, number>;
+  roleId: string;
+  weeklyHours: number;
+}) {
+  const [hours, setHours] = useState(weeklyHours);
   const [failedQuiz, setFailedQuiz] = useState(false);
   const [data, setData] = useState<WeeklyPlan | null>(null);
   const [busy, setBusy] = useState(false);
@@ -198,7 +218,6 @@ function WeekPlanner({ mastery, roleId }: { mastery: Record<string, number>; rol
       body: JSON.stringify({
         targetRoleId: roleId,
         weeklyHours: nextHours,
-        preferences: PREFERENCES,
         mastery,
         ...(nextFailedQuiz && weakestSkill
           ? { assessment: { skillId: weakestSkill, score: 0.4 } }
@@ -221,7 +240,9 @@ function WeekPlanner({ mastery, roleId }: { mastery: Record<string, number>; rol
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        {[8, 5, 2].map((option) => (
+        {/* The learner's own budget leads; the others are the "what if" cases
+            demo scenario 3 exercises. */}
+        {[weeklyHours, ...[8, 5, 2].filter((option) => option !== weeklyHours)].map((option) => (
           <button
             className={`h-9 rounded-md border px-3 text-sm font-medium ${
               data && hours === option ? "border-teal bg-teal/5 text-teal" : "border-border hover:border-teal"
@@ -317,60 +338,6 @@ function WeekPlanner({ mastery, roleId }: { mastery: Record<string, number>; rol
   );
 }
 
-function RolePicker({
-  defaultRoleId,
-  domains,
-  onPick,
-  roles
-}: {
-  defaultRoleId: string | null;
-  domains: Domain[];
-  onPick: (roleId: string) => void;
-  roles: Role[];
-}) {
-  // The learner's saved target role leads, and its domain leads the list — the
-  // rest stay one click away rather than being filtered out.
-  const rank = (domainId: string) =>
-    Number(roles.some((role) => role.domainId === domainId && role.id === defaultRoleId));
-  const ordered = [...domains].sort((a, b) => rank(b.id) - rank(a.id));
-
-  return (
-    <section>
-      <h2 className="text-lg font-semibold text-ink">Pick a target role</h2>
-      {ordered.map((domain) => {
-        const inDomain = roles.filter((role) => role.domainId === domain.id);
-        if (inDomain.length === 0) {
-          return null;
-        }
-
-        return (
-          <div className="mt-6" key={domain.id}>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-teal">{domain.name}</h3>
-            <p className="mt-1 text-sm text-muted">{domain.description}</p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              {inDomain.map((role) => (
-                <button
-                  className={`rounded-lg border bg-surface p-5 text-left font-medium hover:border-teal hover:text-teal ${
-                    role.id === defaultRoleId ? "border-teal text-teal" : "border-border"
-                  }`}
-                  key={role.id}
-                  onClick={() => onPick(role.id)}
-                  type="button"
-                >
-                  {role.title}
-                  {role.id === defaultRoleId && (
-                    <span className="mt-1 block text-xs font-normal text-muted">Your target role</span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </section>
-  );
-}
-
 function QuestionCard({
   busy,
   onAnswer,
@@ -447,12 +414,14 @@ function Results({
   mastery,
   onRestart,
   result,
-  roleId
+  roleId,
+  weeklyHours
 }: {
   mastery: Record<string, number>;
   onRestart: () => void;
   result: Roadmap;
   roleId: string;
+  weeklyHours: number;
 }) {
   const { roadmap, recommendations } = result;
 
@@ -533,7 +502,7 @@ function Results({
         ))}
       </article>
 
-      <WeekPlanner mastery={mastery} roleId={roleId} />
+      <WeekPlanner mastery={mastery} roleId={roleId} weeklyHours={weeklyHours} />
 
       <button
         className="inline-flex h-10 items-center rounded-md border border-border bg-surface px-4 text-sm font-semibold hover:border-teal"

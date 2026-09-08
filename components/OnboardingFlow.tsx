@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Domain, Role } from "@/lib/types";
 import { ManualSetup } from "@/components/ManualSetup";
 import { describeFit } from "@/lib/planner/onboarding-fit";
+import { parseHoursPerWeek, parseWeeks } from "@/lib/planner/duration-phrases";
 import { button, card, eyebrow, input, label } from "@/lib/ui";
 
 type Intent = {
@@ -76,6 +77,70 @@ function Steps({ current, withFollowUp }: { current: string; withFollowUp: boole
   );
 }
 
+/**
+ * Takes words, shows the number they were read as. The learner stays in charge:
+ * an unreadable phrase changes nothing and says so, rather than silently
+ * keeping a value they think they replaced.
+ */
+function PhraseField({
+  hint,
+  id,
+  onParsed,
+  parse,
+  placeholder,
+  title,
+  unit,
+  value
+}: {
+  hint: string;
+  id: string;
+  onParsed: (value: number) => void;
+  parse: (text: string) => number | null;
+  placeholder: string;
+  title: string;
+  unit: string;
+  value: number;
+}) {
+  const [text, setText] = useState("");
+  const parsed = text.trim() ? parse(text) : null;
+
+  function change(next: string) {
+    setText(next);
+    const read = next.trim() ? parse(next) : null;
+    if (read !== null) onParsed(read);
+  }
+
+  return (
+    <div>
+      <label className={label} htmlFor={id}>
+        {title}
+      </label>
+      <input
+        className={input}
+        id={id}
+        maxLength={60}
+        onChange={(event) => change(event.target.value)}
+        placeholder={placeholder}
+        value={text}
+      />
+      <p className="mt-1.5 text-xs leading-5 text-muted" aria-live="polite">
+        {text.trim() && parsed === null ? (
+          <span className="text-amber-200">
+            Couldn&apos;t read that — {hint}. Still using {value} {unit}.
+          </span>
+        ) : (
+          <>
+            Understood as{" "}
+            <span className="font-semibold tabular-nums text-ink">
+              {parsed ?? value} {unit}
+            </span>
+          </>
+        )}
+      </p>
+    </div>
+  );
+}
+
 function Heading({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <>
@@ -105,7 +170,6 @@ export function OnboardingFlow({ domains, roles }: { domains: Domain[]; roles: R
   const [intent, setIntent] = useState<Intent | null>(null);
   const [assumed, setAssumed] = useState<string[]>([]);
   const [manual, setManual] = useState(false);
-  const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -185,7 +249,9 @@ export function OnboardingFlow({ domains, roles }: { domains: Domain[]; roles: R
       const res = await fetch("/api/onboarding", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...intent, consentGiven: consent })
+        // Consent is a condition of having an account (stated at signup), not a
+        // mid-flow toggle: an unchecked box silently discarded a whole diagnostic.
+        body: JSON.stringify({ ...intent, consentGiven: true })
       });
       const data = await res.json();
 
@@ -374,34 +440,26 @@ export function OnboardingFlow({ domains, roles }: { domains: Domain[]; roles: R
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className={label} htmlFor="timeline-weeks">
-                  Timeline (weeks)
-                </label>
-                <input
-                  className={input}
-                  id="timeline-weeks"
-                  max={52}
-                  min={1}
-                  onChange={(e) => setIntent({ ...intent, timelineWeeks: Number(e.target.value) })}
-                  type="number"
-                  value={intent.timelineWeeks}
-                />
-              </div>
-              <div>
-                <label className={label} htmlFor="weekly-hours">
-                  Hours per week
-                </label>
-                <input
-                  className={input}
-                  id="weekly-hours"
-                  max={60}
-                  min={1}
-                  onChange={(e) => setIntent({ ...intent, weeklyHours: Number(e.target.value) })}
-                  type="number"
-                  value={intent.weeklyHours}
-                />
-              </div>
+              <PhraseField
+                hint="try something like &ldquo;12 weeks&rdquo; or &ldquo;five months&rdquo;"
+                id="timeline-weeks"
+                onParsed={(weeks) => setIntent({ ...intent, timelineWeeks: weeks })}
+                parse={parseWeeks}
+                placeholder="about five months"
+                title="How long do you want to give this?"
+                unit="weeks"
+                value={intent.timelineWeeks}
+              />
+              <PhraseField
+                hint="try something like &ldquo;4 hours&rdquo; or &ldquo;a couple of evenings&rdquo;"
+                id="weekly-hours"
+                onParsed={(hours) => setIntent({ ...intent, weeklyHours: hours })}
+                parse={parseHoursPerWeek}
+                placeholder="a couple of evenings a week"
+                title="How much time each week?"
+                unit="hours a week"
+                value={intent.weeklyHours}
+              />
               <div>
                 <label className={label} htmlFor="session-length">
                   Longest single session (hours)
@@ -478,36 +536,11 @@ export function OnboardingFlow({ domains, roles }: { domains: Domain[]; roles: R
           <p className="mt-1.5 text-sm leading-6 opacity-90">{fit.note}</p>
         </div>
 
-        <div className={`${card} p-6`}>
-          <label className="flex gap-3">
-            <input
-              checked={consent}
-              className="mt-1 h-4 w-4 shrink-0"
-              onChange={(e) => setConsent(e.target.checked)}
-              type="checkbox"
-            />
-            <span className="text-sm leading-6 text-muted">
-              <span className="font-medium text-ink">Store and analyze my progress.</span> Your
-              diagnostic answers and completed work are used to estimate your skills and adapt your
-              plan. You can export or delete everything at any time.
-            </span>
-          </label>
-
-          {/* The box is off by default and the cost of leaving it off is a whole
-              diagnostic answered and discarded, so say so here, not in the small print. */}
-          {!consent && (
-            <p className="mt-4 rounded-md border border-amber-400/30 bg-amber-400/10 p-3 text-sm leading-6 text-amber-200">
-              Leaving this off means your diagnostic answers aren&apos;t saved: you&apos;ll see your
-              results on screen, but readiness stays at 0% and the roadmap can&apos;t adapt as you go.
-            </p>
-          )}
-        </div>
-
         {error && <ErrorNote message={error} />}
 
         <div className="flex flex-wrap gap-3">
           <button className={button.primary} disabled={busy} onClick={confirm} type="button">
-            {busy ? "Saving…" : consent ? "Confirm and start diagnostic" : "Continue without saving results"}
+            {busy ? "Saving…" : "Confirm and start diagnostic"}
           </button>
           <button className={button.secondary} disabled={busy} onClick={restart} type="button">
             Rewrite my goal

@@ -1,4 +1,5 @@
-import { listDomains, listRoles } from "@/lib/graph/queries";
+import { redirect } from "next/navigation";
+import { getRole } from "@/lib/graph/queries";
 import { getProfile } from "@/lib/db/learners";
 import { requireUserOrRedirect } from "@/lib/auth/session";
 import { DiagnosticFlow } from "@/components/DiagnosticFlow";
@@ -11,18 +12,29 @@ export const metadata = { title: "Diagnostic" };
 
 export default async function DiagnosticPage() {
   const user = await requireUserOrRedirect("/diagnostic");
-  const [roles, domains, profile] = await Promise.all([listRoles(), listDomains(), getProfile(user.id)]);
+  const profile = await getProfile(user.id);
+
+  // The diagnostic is scored against a target role, so there is nothing to run
+  // without one. Same redirect /gap-analyzer and /match-score already use.
+  if (!profile?.targetRoleId) {
+    redirect("/onboarding");
+  }
+
+  const role = await getRole(profile.targetRoleId);
+
+  if (!role) {
+    redirect("/onboarding");
+  }
 
   return (
     <>
       <SiteHeader current="/diagnostic" showAdmin={isAdmin(user)} user={user} />
       <main id="main">
         <DiagnosticFlow
-          // Results are only stored for a learner who explicitly consented.
           canPersist={user.consentGiven}
-          defaultRoleId={profile?.targetRoleId ?? null}
-          domains={domains}
-          roles={roles}
+          roleTitle={role.title}
+          targetRoleId={profile.targetRoleId}
+          weeklyHours={profile.weeklyHours}
         />
       </main>
     </>

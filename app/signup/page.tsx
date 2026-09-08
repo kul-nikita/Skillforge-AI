@@ -14,7 +14,7 @@ export default async function SignupPage({
 
   return (
     <AuthLayout
-      subtitle="Your diagnostic results and evidence stay private to you. Export or delete them whenever you want."
+      subtitle="Your diagnostic answers and progress are stored and analysed to build your roadmap. They stay private to you — export or delete everything whenever you want."
       title="Create your account"
     >
       <AuthForm mode="signup" next={target} />
