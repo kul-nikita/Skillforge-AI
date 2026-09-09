@@ -15,6 +15,7 @@
     "graph:seed": "tsx --env-file=.env seed/graph/seed.ts",
     "mongo:seed": "tsx --env-file=.env seed/mongo/seed.ts",
     "vector:index": "tsx --env-file=.env seed/vector/index.ts",
+    "demo:seed": "tsx --env-file=.env seed/demo/learner.ts",
     "graph:verify": "tsx --env-file=.env scripts/verify-gate.ts",
     "db:seed:all": "npm run graph:seed && npm run mongo:seed && npm run vector:index"
   },
