@@ -20,6 +20,13 @@ import type { LearningEvent } from "@/lib/adaptation/mastery";
 
 export const DEMO_EMAIL = "demo.analyst@skillforge.dev";
 export const FRESH_EMAIL = "demo.newstarter@skillforge.dev";
+/**
+ * Admin is an ADMIN_EMAILS allowlist, not a role on the account, so this is
+ * only an admin where that env var names it. Kept separate from the learner
+ * account so the demo learner's header does not carry a "Catalog admin" link
+ * a judge would reasonably ask about.
+ */
+export const ADMIN_EMAIL = "demo.curator@skillforge.dev";
 export const DEMO_PASSWORD = "ForgeDemo2026!";
 
 /**
@@ -89,7 +96,7 @@ async function wipe(email: string) {
 }
 
 async function main() {
-  await Promise.all([wipe(DEMO_EMAIL), wipe(FRESH_EMAIL)]);
+  await Promise.all([wipe(DEMO_EMAIL), wipe(FRESH_EMAIL), wipe(ADMIN_EMAIL)]);
 
   const passwordHash = await hashPassword(DEMO_PASSWORD);
 
@@ -97,6 +104,9 @@ async function main() {
   // signing someone up on stage. No profile, no events, nothing.
   const fresh = await createUser(FRESH_EMAIL, passwordHash);
   await setConsent(fresh.id, true);
+
+  const curator = await createUser(ADMIN_EMAIL, passwordHash);
+  await setConsent(curator.id, true);
 
   const learner = await createUser(DEMO_EMAIL, passwordHash);
   await setConsent(learner.id, true);
@@ -159,7 +169,8 @@ async function main() {
 
   console.log(`Seeded ${DEMO_EMAIL} (${events.length} events, ${COMPLETIONS.length} evidence items)`);
   console.log(`Seeded ${FRESH_EMAIL} (no profile — for demonstrating onboarding)`);
-  console.log(`Password for both: ${DEMO_PASSWORD}`);
+  console.log(`Seeded ${ADMIN_EMAIL} (admin only where ADMIN_EMAILS names it)`);
+  console.log(`Password for all three: ${DEMO_PASSWORD}`);
 }
 
 main()
