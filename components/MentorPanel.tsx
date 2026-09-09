@@ -9,7 +9,9 @@ type Turn = { question: string; answer: string; source: string };
 const SUGGESTIONS = [
   "What should I do today?",
   "Why is that skill blocked?",
-  "How far off am I?"
+  "How long until I'm ready?",
+  "What have I actually proved?",
+  "What else could I do instead?"
 ];
 
 /**
@@ -38,7 +40,12 @@ export function MentorPanel() {
       const res = await fetch("/api/mentor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: asked })
+        // The last few turns go back with the question, so "what about the
+        // second one" is read as a follow-up rather than a new question.
+        body: JSON.stringify({
+          question: asked,
+          history: turns.slice(-3).map((turn) => ({ question: turn.question, answer: turn.answer }))
+        })
       });
       const data = await res.json();
 

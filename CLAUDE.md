@@ -344,6 +344,31 @@ Still not true / not built:
 Update this section as the build progresses so a fresh Claude Code session
 knows where things stand without re-deriving it.
 
+- 2026-09-09: **The mentor can now answer the questions it was refusing.**
+  It was declining fair questions — "how long until I'm ready", "what have I
+  actually proved", "what else could I do instead" — because the fact pack
+  genuinely did not contain the answers, which reads as a useless assistant
+  rather than a careful one. The pack gained weekly hours, timeline,
+  `predictTimeline`'s weeks-to-ready, the evidence the learner has actually
+  scored, the full roadmap order, what each skill unlocks, diagnostics taken,
+  and candidates for the next three gaps rather than only the first — with
+  cost and type, so "is it free" is answerable. The cost is stated where it
+  matters: `mentorAllowedNumbers` walks the pack, so every number added is one
+  the grounding guard now permits, which is why the lists stay capped.
+  Conversation history (last three turns) is sent with each question and fenced
+  as untrusted like the question itself, and the prompt is explicit that "that
+  one" / "it" must be resolved against the previous turn **before** refusing —
+  without that instruction the model had the history and still declined.
+  Two real defects fixed on the way. **Ten catalogue providers are
+  domain-shaped** — `Malware-Traffic-Analysis.net`, `web.dev`, `Scrum.org` — and
+  `findViolations` was rejecting the whole answer as an invented URL when the
+  model named one we had supplied. It now takes the verbatim strings the facts
+  contain; a made-up domain is still rejected, and both cases are pinned by
+  tests. And the mentor computed `blockedBy` from **direct** prerequisites only
+  while the roadmap screen shows the transitive chain, so the two could name
+  different blockers for the same skill; it now reads `gap.blockedBy` from the
+  planner.
+
 - 2026-09-09: **"If you follow the recommended path" on the job-fit page.**
   The posting is scored twice against the same parse: once on today's mastery,
   once on `projectMasteryAfterPath` — the mastery the roadmap would leave behind.

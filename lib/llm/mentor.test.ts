@@ -15,8 +15,24 @@ const FACTS: MentorFacts = {
     { skill: "Log Analysis", masteryPercent: 10, blockedBy: [] },
     { skill: "SIEM Querying", masteryPercent: 0, blockedBy: ["Log Analysis"] }
   ],
-  nextResources: [{ title: "Splunk Search Tutorial", provider: "Splunk", durationMinutes: 240 }],
-  evidenceCount: 2
+  nextResources: [
+    {
+      forSkill: "Log Analysis",
+      title: "Splunk Search Tutorial",
+      provider: "Splunk",
+      durationMinutes: 240,
+      costType: "free",
+      resourceType: "course"
+    }
+  ],
+  evidenceCount: 2,
+  weeklyHours: 8,
+  timelineWeeks: 12,
+  weeksToReady: 14,
+  evidence: [{ skill: "Networking Basics", summary: "Subnetting lab", scorePercent: 85 }],
+  roadmapOrder: ["Log Analysis", "SIEM Querying"],
+  unlocks: [{ skill: "Log Analysis", opens: ["SIEM Querying"] }],
+  diagnosticsTaken: 1
 };
 
 const check = (text: string) => findViolations(text, mentorAllowedNumbers(FACTS));
@@ -71,5 +87,43 @@ describe("mentor grounding", () => {
   it("does not permit numbers merely adjacent to the pack", () => {
     // 25 is one off from readiness; the guard is exact, not approximate.
     expect(check("Readiness is 25%.")).toEqual([{ kind: "number", detail: "25" }]);
+  });
+});
+
+describe("mentor grounding — provider names that look like domains", () => {
+  const providers = FACTS.nextResources.map((resource) => resource.provider);
+
+  it("lets the model name a provider we supplied, even a domain-shaped one", () => {
+    // Ten catalogue providers are domain-shaped. Rejecting them as invented
+    // URLs threw away whole answers to fair questions like "what else could I
+    // do instead?".
+    const facts: MentorFacts = {
+      ...FACTS,
+      nextResources: [
+        {
+          forSkill: "Log Analysis",
+          title: "Traffic Analysis Exercises",
+          provider: "Malware-Traffic-Analysis.net",
+          durationMinutes: 120,
+          costType: "free",
+          resourceType: "lab"
+        }
+      ]
+    };
+
+    expect(
+      findViolations(
+        "Try Traffic Analysis Exercises from Malware-Traffic-Analysis.net.",
+        mentorAllowedNumbers(facts),
+        [],
+        facts.nextResources.map((resource) => resource.provider)
+      )
+    ).toEqual([]);
+  });
+
+  it("still rejects a URL the facts never contained", () => {
+    expect(
+      findViolations("Go to totally-made-up-site.com for more.", mentorAllowedNumbers(FACTS), [], providers)
+    ).toEqual([{ kind: "url", detail: "totally-made-up-site.com" }]);
   });
 });

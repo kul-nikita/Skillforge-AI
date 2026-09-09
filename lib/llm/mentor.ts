@@ -7,6 +7,8 @@ import { findViolations, type GroundingViolation } from "@/lib/llm/grounded-expl
  * number in it is another number the grounding check must permit, so a bloated
  * pack quietly weakens the guard.
  */
+export type MentorTurn = { question: string; answer: string };
+
 export type MentorFacts = {
   roleTitle: string;
   /**
@@ -26,8 +28,38 @@ export type MentorFacts = {
     masteryPercent: number;
     blockedBy: string[];
   }>;
-  nextResources: Array<{ title: string; provider: string; durationMinutes: number }>;
+  /** Options for the next few gaps, not only the very next one — "what else
+   * could I do instead" was unanswerable when only one gap had candidates. */
+  nextResources: Array<{
+    forSkill: string;
+    title: string;
+    provider: string;
+    durationMinutes: number;
+    costType: string;
+    resourceType: string;
+  }>;
   evidenceCount: number;
+
+  /**
+   * Everything below was added because the mentor kept correctly refusing fair
+   * questions — "how long will this take", "what have I already proved",
+   * "how many hours a week am I meant to do" — that it simply had no facts for.
+   *
+   * The cost is real and worth stating: `mentorAllowedNumbers` walks this pack,
+   * so every number added here is a number the grounding guard will now permit
+   * in the reply. The lists are capped by the route for that reason.
+   */
+  weeklyHours: number;
+  timelineWeeks: number;
+  /** From the same predictor the dashboard timeline uses. */
+  weeksToReady: number;
+  /** What the learner has actually proved, not what they claimed. */
+  evidence: Array<{ skill: string; summary: string; scorePercent: number }>;
+  /** Every gap in planner order, so "what comes after that" is answerable. */
+  roadmapOrder: string[];
+  /** Skills each gap opens up once evidenced. */
+  unlocks: Array<{ skill: string; opens: string[] }>;
+  diagnosticsTaken: number;
 };
 
 export const MAX_QUESTION_CHARS = 500;
@@ -71,10 +103,26 @@ export const UNAVAILABLE =
 
 const SYSTEM = `
 You are a learning mentor talking to one learner about their own roadmap.
-Answer in at most 60 words, plain prose, no markdown, no lists.
+Answer in at most 120 words, plain prose, no markdown. A short inline list is
+fine when the question genuinely asks for several things; otherwise prose.
 
-Use ONLY the facts in the LEARNER STATE block. If the answer is not in there,
-reply with exactly: "${CANNOT_ANSWER}"
+Answer the question that was actually asked. If EARLIER IN THIS CONVERSATION is
+present, the learner may be referring back to it ("what about the second one",
+"why that instead"), so read it before deciding you cannot answer.
+
+RESOLVE REFERENCES BEFORE REFUSING. "That one", "it", "the second", "the lab"
+mean whatever you or the learner named most recently. Work out which item they
+mean, look that item up in LEARNER STATE, and answer about it. Only use the
+refusal sentence when the fact genuinely is not in LEARNER STATE at all — not
+because the question was phrased indirectly.
+
+Use ONLY the facts in the LEARNER STATE block. If the answer is genuinely not in
+there, reply with exactly: "${CANNOT_ANSWER}"
+
+LEARNER STATE holds more than the roadmap: their weekly hours and timeline, how
+many weeks until they are ready, every resource option with its provider,
+duration, cost and type, what they have already evidenced and scored, the full
+skill order, and what each skill unlocks. Check all of it before refusing.
 
 The learner stated their own objective, experience, interests, known skills and
 past courses. Treat those as what they told you about themselves, not as proven
@@ -99,7 +147,9 @@ exact sentence above.
  */
 export async function answerMentorQuestion(
   question: string,
-  facts: MentorFacts
+  facts: MentorFacts,
+  /** Recent turns, oldest first, so a follow-up is not read as a new question. */
+  history: MentorTurn[] = []
 ): Promise<{ text: string; source: "llm" | "fallback"; violations: GroundingViolation[] }> {
   if (!llmApiKey()) {
     return { text: UNAVAILABLE, source: "fallback", violations: [] };
@@ -126,7 +176,14 @@ export async function answerMentorQuestion(
       return { text: cleaned, source: "llm", violations: [] };
     }
 
-    const violations = findViolations(cleaned, mentorAllowedNumbers(facts));
+    const violations = findViolations(
+      cleaned,
+      mentorAllowedNumbers(facts),
+      [],
+      // Provider names came from the catalog, so the model naming one is
+      // quoting us, not inventing a link.
+      facts.nextResources.map((resource) => resource.provider)
+    );
 
     return violations.length > 0
       ? { text: CANNOT_ANSWER, source: "fallback", violations }

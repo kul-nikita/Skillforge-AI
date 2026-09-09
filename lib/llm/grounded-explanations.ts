@@ -83,12 +83,22 @@ export function findViolations(
   text: string,
   permitted: Set<string>,
   /** Words from BANNED_CLAIMS that these facts genuinely support, e.g. a certificate artifact. */
-  allowedClaims: string[] = []
+  allowedClaims: string[] = [],
+  /**
+   * Verbatim strings the facts already contain, which the URL check would
+   * otherwise reject. Ten catalog providers are domain-shaped —
+   * "Malware-Traffic-Analysis.net", "web.dev", "Scrum.org" — so naming the
+   * provider we supplied was being discarded as an invented URL, taking the
+   * whole answer with it. The guard exists to stop the model *originating* a
+   * URL; echoing one of our own provider names is not that.
+   */
+  allowedText: string[] = []
 ): GroundingViolation[] {
   const violations: GroundingViolation[] = [];
+  const allowed = new Set(allowedText.map((value) => value.toLowerCase()));
 
   const url = text.match(URLISH);
-  if (url) {
+  if (url && !allowed.has(url[0].toLowerCase())) {
     violations.push({ kind: "url", detail: url[0] });
   }
 
@@ -113,7 +123,9 @@ export function findViolations(
  */
 export function findGroundingViolations(text: string, facts: GroundedFacts): GroundingViolation[] {
   // "certificate" is only allowed if the artifact really is one.
-  return findViolations(text, allowedNumbers(facts), [facts.resource.evidenceType ?? ""]);
+  return findViolations(text, allowedNumbers(facts), [facts.resource.evidenceType ?? ""], [
+    facts.resource.provider
+  ]);
 }
 
 export async function generateGroundedExplanation(
