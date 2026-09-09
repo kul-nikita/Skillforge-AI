@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Check, AlertTriangle, X, Loader2 } from "lucide-react";
+import { Search, Check, AlertTriangle, X, Loader2, ArrowRight } from "lucide-react";
 
 type MatchedSkill = {
   parsedSkill: {
@@ -44,6 +44,12 @@ type GapAnalysisResult = {
   role: {
     id: string;
     title: string;
+  };
+  projection?: {
+    overallMatch: number;
+    requiredMatch: number;
+    wontCover: string[];
+    weeks: number;
   };
 };
 
@@ -158,6 +164,70 @@ export function GapAnalysis() {
               Matched against role: <span className="font-medium text-ink">{result.role.title}</span>
             </p>
           </div>
+
+          {/* What following the recommended path would do to that number. The
+              projection is arithmetic over the planner's own target mastery —
+              no second model call, and it is allowed to fall short. */}
+          {result.projection && (
+            <div className="rounded-lg border border-border bg-surface p-6">
+              <h3 className="text-lg font-semibold text-ink">If you follow the recommended path</h3>
+              <div className="mt-4 flex flex-wrap items-end gap-6">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted">Today</p>
+                  <p className="font-display text-3xl font-semibold tabular-nums text-ink">
+                    {Math.round(result.gapAnalysis.overallMatch * 100)}%
+                  </p>
+                </div>
+                <ArrowRight aria-hidden="true" className="mb-2 text-muted" size={20} />
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted">
+                    After the path · about {result.projection.weeks} week
+                    {result.projection.weeks === 1 ? "" : "s"}
+                  </p>
+                  <p className="font-display text-3xl font-semibold tabular-nums text-emerald-300">
+                    {Math.round(result.projection.overallMatch * 100)}%
+                  </p>
+                </div>
+                <div className="ml-auto text-right">
+                  <p className="text-xs uppercase tracking-wide text-muted">Must-haves</p>
+                  <p className="text-sm tabular-nums text-ink">
+                    {Math.round(result.gapAnalysis.requiredMatch * 100)}% →{" "}
+                    <span className="font-semibold text-emerald-300">
+                      {Math.round(result.projection.requiredMatch * 100)}%
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+                <div className="h-full bg-emerald-400/30" style={{ width: `${result.projection.overallMatch * 100}%` }}>
+                  <div
+                    className="h-full bg-teal"
+                    style={{
+                      width: `${
+                        result.projection.overallMatch > 0
+                          ? (result.gapAnalysis.overallMatch / result.projection.overallMatch) * 100
+                          : 0
+                      }%`
+                    }}
+                  />
+                </div>
+              </div>
+
+              {result.projection.wontCover.length > 0 ? (
+                <p className="mt-4 rounded-md border border-amber-400/30 bg-amber-400/10 p-3 text-sm leading-6 text-amber-200">
+                  The path will not close everything this posting asks for. Your target role does not
+                  teach {result.projection.wontCover.join(", ")}, so
+                  {result.projection.wontCover.length === 1 ? " it stays" : " they stay"} open
+                  afterwards.
+                </p>
+              ) : (
+                <p className="mt-4 text-sm leading-6 text-muted">
+                  Every requirement this posting names is on your path.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Matched Skills */}
           <div className="rounded-lg border border-border bg-surface p-6">

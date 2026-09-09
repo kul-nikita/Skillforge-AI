@@ -344,6 +344,19 @@ Still not true / not built:
 Update this section as the build progresses so a fresh Claude Code session
 knows where things stand without re-deriving it.
 
+- 2026-09-09: **"If you follow the recommended path" on the job-fit page.**
+  The posting is scored twice against the same parse: once on today's mastery,
+  once on `projectMasteryAfterPath` — the mastery the roadmap would leave behind.
+  Deterministic, no second model call, and the weeks come from the existing
+  `predictTimeline`. The projection is deliberately allowed to fall short:
+  `projectMasteryAfterPath` raises only the target role's own skills, so a
+  posting asking for Python and PowerShell when the role never teaches them
+  still shows those open afterwards, and `requirementsPathWontCover` names them.
+  Projecting everything to mastered would have turned the comparison into an
+  advert. On the junior pentester posting: 29% -> 73% overall, must-haves
+  40% -> 100%, with HTTP & REST APIs, Operating Systems, Python Basics and
+  Shell Scripting called out as still open.
+
 - 2026-09-09: **The JD gap analyzer was matching almost nothing, and it took a
   real posting to see it.** `matchJDSkillsToGraph` mapped a parsed requirement to
   a graph skill by **exact lowercase name equality**, and the parse prompt was

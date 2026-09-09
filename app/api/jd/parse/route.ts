@@ -3,7 +3,9 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth/session";
 import { parseJobDescription, matchJDSkillsToGraph } from "@/lib/llm/jd-parsing";
 import { getSkillGraph, getRole } from "@/lib/graph/queries";
-import { getMastery, getProfile } from "@/lib/db/learners";
+import { getMastery, getProfile, listEvents } from "@/lib/db/learners";
+import { projectMasteryAfterPath, requirementsPathWontCover } from "@/lib/planner/path-projection";
+import { predictTimeline } from "@/lib/prediction/timeline";
 import { LlmError } from "@/lib/llm/client";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +30,8 @@ export async function POST(request: Request) {
   }
 
   const { jdText } = parsed.data;
-  const roleId = (await getProfile(user.id))?.targetRoleId;
+  const profile = await getProfile(user.id);
+  const roleId = profile?.targetRoleId;
 
   // The graph is needed before parsing, not after: the model maps each posting
   // requirement onto a real skill id, so it has to be told which ids exist.
@@ -59,9 +62,29 @@ export async function POST(request: Request) {
 
     const gapAnalysis = matchJDSkillsToGraph(jdResult.skills, graph, mastery, role);
 
+    // The same posting, scored against the mastery the recommended path would
+    // leave the learner holding. Deterministic — no second model call, and the
+    // JD parse is reused rather than repeated.
+    const afterPath = matchJDSkillsToGraph(
+      jdResult.skills,
+      graph,
+      projectMasteryAfterPath(mastery, role),
+      role
+    );
+
+    const events = await listEvents(user.id);
+
     return NextResponse.json({
       ...jdResult,
       gapAnalysis,
+      projection: {
+        overallMatch: afterPath.overallMatch,
+        requiredMatch: afterPath.requiredMatch,
+        // Named rather than hidden: the path covers the target role, so a
+        // posting that asks for more than the role stays short afterwards.
+        wontCover: requirementsPathWontCover(gapAnalysis.matched, role),
+        weeks: predictTimeline({ profile, mastery, role, graph, events }).expected
+      },
       role: { id: role.id, title: role.title }
     });
   }
