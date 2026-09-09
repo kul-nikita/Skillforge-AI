@@ -58,9 +58,78 @@ export function AdminCatalog({
   const [newHost, setNewHost] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState("");
+  /** Fields the page did not state, so they are visibly blank rather than guessed. */
+  const [notStated, setNotStated] = useState<string[]>([]);
+  const [autofill, setAutofill] = useState<string | null>(null);
 
   function set<K extends keyof typeof BLANK>(key: K, value: (typeof BLANK)[K]) {
     setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  /**
+   * Reads the record off the page the admin pasted. Nothing is saved, and a
+   * field the page did not state stays empty and is listed — a plausible
+   * duration nobody checked is worse than an empty box.
+   */
+  async function fillFromPage() {
+    if (!form.url.trim()) return;
+
+    setBusy(true);
+    setAutofill(null);
+    setNotStated([]);
+    setIssues([]);
+
+    try {
+      const res = await fetch("/api/admin/resources/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: form.url.trim() })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setAutofill(typeof data.error === "string" ? data.error : "Could not read that page.");
+        return;
+      }
+
+      const f = data.fields;
+
+      setForm((current) => ({
+        ...current,
+        // Only overwrite what the page actually stated; a null leaves whatever
+        // the admin already typed.
+        title: f.title ?? current.title,
+        provider: f.provider ?? current.provider,
+        description: f.description ?? current.description,
+        resourceType: f.resourceType ?? current.resourceType,
+        difficulty: f.difficulty ?? current.difficulty,
+        durationMinutes: f.durationMinutes ?? current.durationMinutes,
+        costType: f.costType ?? current.costType,
+        skillTags: f.skillTags.length > 0 ? f.skillTags.join(", ") : current.skillTags,
+        id:
+          current.id ||
+          (f.title ?? "")
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, "")
+            .slice(0, 60)
+      }));
+
+      setNotStated(f.notStated ?? []);
+      setAutofill(
+        [
+          data.duplicateOf ? `This URL is already in the catalog as ${data.duplicateOf}.` : null,
+          data.hostAllowed ? null : `${data.host} is outside the sourcing allowlist — saving will ask you to confirm.`,
+          "Read from the page. Check every field before saving."
+        ]
+          .filter(Boolean)
+          .join(" ")
+      );
+    } catch {
+      setAutofill("Could not reach the server.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function save(allowNewDomain: boolean) {
@@ -193,13 +262,34 @@ export function AdminCatalog({
 
           <div className="sm:col-span-2">
             <Field label="URL">
-              <input
-                className={INPUT}
-                onChange={(event) => set("url", event.target.value)}
-                placeholder="https://owasp.org/www-project-top-ten/"
-                value={form.url}
-              />
+              <div className="flex gap-2">
+                <input
+                  className={INPUT}
+                  onChange={(event) => set("url", event.target.value)}
+                  placeholder="https://owasp.org/www-project-top-ten/"
+                  value={form.url}
+                />
+                <button
+                  className="shrink-0 rounded-md border border-teal px-3 text-sm font-medium text-teal hover:bg-teal/10 disabled:opacity-40"
+                  disabled={busy || !form.url.trim()}
+                  onClick={() => void fillFromPage()}
+                  type="button"
+                >
+                  {busy ? "Reading…" : "Autofill from page"}
+                </button>
+              </div>
             </Field>
+            {autofill && (
+              <p className="mt-2 rounded-md border border-cyan-300/20 bg-cyan-300/5 p-3 text-xs leading-5 text-cyan-100">
+                {autofill}
+              </p>
+            )}
+            {notStated.length > 0 && (
+              <p className="mt-2 rounded-md border border-amber-400/30 bg-amber-400/10 p-3 text-xs leading-5 text-amber-200">
+                The page did not state: {notStated.join(", ")}. These were left as they were — fill
+                them in yourself rather than accepting the default.
+              </p>
+            )}
           </div>
 
           <div className="sm:col-span-2">
