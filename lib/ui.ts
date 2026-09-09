@@ -35,3 +35,14 @@ export const eyebrow = "text-xs font-medium text-muted";
 
 /** Numbers are the point of this product, so they get their own treatment. */
 export const figure = "font-display text-3xl font-semibold tabular-nums tracking-tight text-ink";
+
+/**
+ * The three mastery states, coloured once. Gap analysis and role readiness had
+ * their own copies of this map, which is how they drifted into looking like two
+ * unrelated features.
+ */
+export const STATUS_TONE: Record<"mastered" | "partial" | "missing", string> = {
+  mastered: "bg-emerald-500/10 text-emerald-300",
+  partial: "bg-amber-500/10 text-amber-300",
+  missing: "bg-red-500/10 text-red-300"
+};

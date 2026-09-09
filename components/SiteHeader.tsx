@@ -17,8 +17,7 @@ const PATH_NAV = [
 
 const TOOL_NAV = [
   { href: "/graph", label: "Skill map" },
-  { href: "/gap-analyzer", label: "Job fit" },
-  { href: "/match-score", label: "Am I ready?" }
+  { href: "/gap-analyzer", label: "Job fit" }
 ];
 
 export function SiteHeader({

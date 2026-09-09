@@ -15,7 +15,7 @@ export default async function DiagnosticPage() {
   const profile = await getProfile(user.id);
 
   // The diagnostic is scored against a target role, so there is nothing to run
-  // without one. Same redirect /gap-analyzer and /match-score already use.
+  // without one. The same redirect /gap-analyzer already uses.
   if (!profile?.targetRoleId) {
     redirect("/onboarding");
   }

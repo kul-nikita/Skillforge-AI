@@ -275,7 +275,7 @@ when nothing read them at runtime. Current truth, verified:
   skills from a pasted job description — names, required/nice-to-have,
   confidence, and the source phrase — then `matchJDSkillsToGraph` maps them onto
   the target role's Neo4j skills. The model proposes skill names; the graph is
-  the only thing that says which exist and how they order. `/match-score`
+  the only thing that says which exist and how they order. The role match score
   (`POST /api/match-score`) and the dashboard's readiness timeline
   (`lib/prediction/timeline.ts`) make **no model call at all** — both are
   formulas over the same mastery map the dashboard reads. `/graph` renders the
@@ -343,6 +343,20 @@ Still not true / not built:
 
 Update this section as the build progresses so a fresh Claude Code session
 knows where things stand without re-deriving it.
+
+- 2026-09-09: **"Am I ready?" merged into "Job fit".** The two pages looked
+  like duplicates because one of them was a lie: `MatchScoreCard` asked the
+  learner to paste a job description, spent a model call parsing it with
+  `/api/jd/parse`, kept only `jobTitle`, then called `/api/match-score` — which
+  takes **no body at all** and scores the learner's target role. The number
+  rendered under the job title would have been identical for any posting pasted.
+  The score itself is honest, so it moved to `/gap-analyzer` as
+  `components/RoleReadinessBand`, computed server-side on load: it needs no
+  posting, so it no longer asks for one. `/match-score` is now a redirect and
+  `MatchScoreCard` is deleted; the nav has one entry where it had two.
+  `STATUS_TONE` moved into `lib/ui` — gap analysis and readiness each had their
+  own copy of the mastered/partial/missing colours, which is part of how they
+  drifted into looking unrelated. 227 tests, build green.
 
 - 2026-09-09: **Flow coherence, then real adaptivity** (spec:
   `docs/superpowers/specs/2026-09-09-flow-coherence-design.md`).
