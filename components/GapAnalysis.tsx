@@ -37,6 +37,7 @@ type GapAnalysisResult = {
       confidence: number;
       originalText: string;
     }>;
+    credentials: Array<{ name: string; required: boolean }>;
     overallMatch: number;
     requiredMatch: number;
   };
@@ -223,6 +224,33 @@ export function GapAnalysis() {
                       {Math.round(skill.confidence * 100)}% confidence
                     </span>
                   </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Credentials are proof, not skills: nothing in the catalogue teaches
+              OSCP, so listing it as a gap points at a step that does not exist. */}
+          {(result.gapAnalysis.credentials ?? []).length > 0 && (
+            <div className="rounded-lg border border-border bg-surface p-6">
+              <h3 className="text-lg font-semibold text-ink">
+                Certifications this posting mentions ({result.gapAnalysis.credentials.length})
+              </h3>
+              <p className="mt-1 text-sm text-muted">
+                Credentials, not skills — they are earned by examination, so they are not part of
+                your roadmap. The skills they test are.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {result.gapAnalysis.credentials.map((c) => (
+                  <span
+                    className="rounded-md border border-border bg-white/[0.03] px-3 py-1.5 text-sm text-ink"
+                    key={c.name}
+                  >
+                    {c.name}
+                    <span className="ml-2 text-xs text-muted">
+                      {c.required ? "required" : "a plus"}
+                    </span>
+                  </span>
                 ))}
               </div>
             </div>

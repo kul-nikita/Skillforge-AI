@@ -344,6 +344,26 @@ Still not true / not built:
 Update this section as the build progresses so a fresh Claude Code session
 knows where things stand without re-deriving it.
 
+- 2026-09-09: **The JD gap analyzer was matching almost nothing, and it took a
+  real posting to see it.** `matchJDSkillsToGraph` mapped a parsed requirement to
+  a graph skill by **exact lowercase name equality**, and the parse prompt was
+  never told the graph existed — so it invented free-form names. On a real junior
+  pentester posting: 28 requirements extracted, **2 matched**, 26 listed as
+  "skills not in your learning path", `overallMatch` 0% for a learner sitting at
+  48% readiness on that very role. "TCP/IP", "Linux", "XSS" and "Nmap" can never
+  string-equal "Networking Basics", "Linux Fundamentals" or "Web Security Basics".
+  The parse step now receives the seeded skill ids as an enum and returns a
+  `graphSkillId` per requirement — the same "model proposes, graph disposes"
+  shape `extractLearnerIntent` uses for roles — with name equality kept as the
+  fallback. Two things fell out of doing it properly: several requirements map to
+  one skill ("TCP/IP", "DNS", "HTTP/HTTPS" are one networking skill, not three),
+  so matches are deduped per graph skill or networking would have been weighted
+  triple; and certifications are flagged `isCredential` and shown separately,
+  because eJPT and OSCP are earned by examination and listing them as missing
+  skills points the learner at a step the catalogue cannot teach.
+  Same posting after the fix: 15 requirements, **9 matched**, 4 credentials,
+  **0 unmatched**, overallMatch 31% / requiredMatch 40%.
+
 - 2026-09-09: **"Am I ready?" merged into "Job fit".** The two pages looked
   like duplicates because one of them was a lie: `MatchScoreCard` asked the
   learner to paste a job description, spent a model call parsing it with

@@ -30,13 +30,17 @@ export async function POST(request: Request) {
   const { jdText } = parsed.data;
   const roleId = (await getProfile(user.id))?.targetRoleId;
 
+  // The graph is needed before parsing, not after: the model maps each posting
+  // requirement onto a real skill id, so it has to be told which ids exist.
+  const graph = await getSkillGraph();
+
   // Parse the JD with the chat model
   let jdResult;
   try {
-    jdResult = await parseJobDescription(jdText);
+    jdResult = await parseJobDescription(jdText, graph.skills);
   } catch (error) {
     if (error instanceof LlmError) {
-      console.error("[jd/parse] gemini call failed:", error.message);
+      console.error("[jd/parse] model call failed:", error.message);
       return NextResponse.json(
         { error: "Could not read that job description right now. Try again in a moment." },
         { status: 502 }
@@ -47,11 +51,7 @@ export async function POST(request: Request) {
 
   // If roleId provided, also do the gap analysis
   if (roleId) {
-    const [role, graph, mastery] = await Promise.all([
-      getRole(roleId),
-      getSkillGraph(),
-      getMastery(user.id)
-    ]);
+    const [role, mastery] = await Promise.all([getRole(roleId), getMastery(user.id)]);
 
     if (!role) {
       return NextResponse.json({ error: `Unknown role: ${roleId}` }, { status: 404 });
